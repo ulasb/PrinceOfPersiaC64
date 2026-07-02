@@ -174,3 +174,7 @@ IN_SHIFT = 16
         lda kid_seq+1
         sbc #>val
 .endmacro
+
+zp_tcnt     = $6a           ; frames until next game tick
+zp_fcol     = $6b           ; fronts_near_kid scan origin
+zp_frow     = $6c

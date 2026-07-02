@@ -62,14 +62,14 @@ onto the C64 fixed multicolor set per 4×8 cell — needs experimentation in Pha
 
 - [x] **0. Walking skeleton** — ca65+VICE toolchain, Makefile, headless
       screenshot smoke test (`make test`)
-- [ ] **1. Asset pipeline** — converters for levels/bgtab/chtab/anim data;
+- [x] **1. Asset pipeline** — converters for levels/bgtab/chtab/anim data;
       palette experiments; measure real converted sizes
-- [ ] **2. Room renderer** — draw Level 1 Room 1 from BGDATA piece tables into
+- [x] **2. Room renderer** — draw Level 1 Room 1 from BGDATA piece tables into
       the bitmap; port the C/B/A/D block-section drawing model; room-to-room
       redraw; screenshot-compare against the Python renderer
-- [ ] **3. Kid animation** — sequence interpreter (14 opcodes) + FRAMEDEF frame
+- [x] **3. Kid animation** — sequence interpreter (14 opcodes) + FRAMEDEF frame
       advance; sprite compositing/multiplex; stand/turn/run on one screen
-- [ ] **4. Movement & collision** — full control layer (jumps, climbs, hang,
+- [x] **4. Movement & collision** — full control layer (jumps, climbs, hang,
       falls, damage thresholds), barrier collision, room transitions with
       camera cuts
 - [ ] **5. Tile machinery** — plates→gates wiring, exit door, loose floors,

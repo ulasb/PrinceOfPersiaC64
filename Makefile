@@ -24,7 +24,7 @@ assets:
 
 ASFLAGS ?=
 
-$(BUILDIR)/%.o: $(SRCDIR)/%.s
+$(BUILDIR)/%.o: $(SRCDIR)/%.s $(SRCDIR)/pop.inc
 	@mkdir -p $(dir $@)
 	$(AS) -g $(ASFLAGS) -o $@ -l $(BUILDIR)/$*.lst $<
 
@@ -44,3 +44,8 @@ test: $(PRG)
 
 clean:
 	rm -rf $(BUILDIR)
+
+# disk image for real hardware / emulator file browsers
+d64: $(PRG)
+	c1541 -format "pop c64,01" d64 $(BUILDIR)/pop.d64 -write $(PRG) "prince of persia" >/dev/null
+	@echo "OK: $(BUILDIR)/pop.d64"

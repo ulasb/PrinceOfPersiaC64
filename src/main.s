@@ -107,7 +107,10 @@ entry:
         lda #0
         sta zp_frame
         sta zp_previn
+        lda #3
+        sta zp_tcnt
 .ifdef TESTSCRIPT
+        lda #0
         sta script_idx
         sta script_left
         sta script_val
@@ -124,11 +127,11 @@ mainloop:
         cmp #251
         beq @wait2              ; make sure we pass it only once
         inc zp_frame
-        lda zp_frame
-        and #3
+        dec zp_tcnt
         beq @tick
         jmp mainloop
-@tick:
+@tick:  lda #3                  ; game tick every 3rd frame (PAL)
+        sta zp_tcnt
         jsr read_input
         lda zp_previn
         eor #$ff
@@ -177,15 +180,15 @@ fronts_near_kid:
         jsr kid_getcol
         sec
         sbc #1
-        sta zp_tmp+2            ; start col
+        sta zp_fcol             ; start col
         lda kid_row
         sec
         sbc #1
-        sta zp_tmp+3            ; start row
+        sta zp_frow             ; start row
         ldx #0
 @rowl:  txa
         clc
-        adc zp_tmp+3
+        adc zp_frow
         cmp #$ff                ; -1 is a valid row
         beq @rowok
         cmp #3
@@ -194,7 +197,7 @@ fronts_near_kid:
         ldy #0
 @coll:  tya
         clc
-        adc zp_tmp+2
+        adc zp_fcol
         cmp #$ff                ; -1 is a valid col
         beq @colok
         cmp #11
@@ -277,14 +280,10 @@ read_input:
         rts
 
 tscript:
-        .byte 6, 0              ; settle
-        .byte 4, IN_UP          ; jump up in place
-        .byte 20, 0
-        .byte 40, IN_RIGHT      ; run right, off the ledge, fall + land
-        .byte 15, 0
-        .byte 20, IN_LEFT       ; run left along the bottom corridor
-        .byte 4, IN_UP          ; try to climb the ledge above
-        .byte 40, IN_UP
+        .byte 6, 0              ; settle (entry drop)
+        .byte 40, IN_RIGHT      ; off the ledge to the bottom corridor
+        .byte 12, 0
+        .byte 200, IN_LEFT      ; run left through the room link
         .byte 30, 0
         .byte 0
 
