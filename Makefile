@@ -6,17 +6,22 @@ SRCDIR  = src
 BUILDIR = build
 CFG     = pop.cfg
 
-SOURCES = $(wildcard $(SRCDIR)/*.s)
+SOURCES = $(wildcard $(SRCDIR)/*.s) $(wildcard $(SRCDIR)/data/*.s)
 OBJECTS = $(patsubst $(SRCDIR)/%.s,$(BUILDIR)/%.o,$(SOURCES))
 
 PRG     = $(BUILDIR)/pop.prg
 
-.PHONY: all run test clean
+.PHONY: all run test clean assets
+
+# Regenerate data tables and level binaries from ../PrinceOfPersiaPy
+assets:
+	python3 tools/gen_anim_data.py
+	python3 tools/copy_levels.py
 
 all: $(PRG)
 
 $(BUILDIR)/%.o: $(SRCDIR)/%.s
-	@mkdir -p $(BUILDIR)
+	@mkdir -p $(dir $@)
 	$(AS) -g -o $@ -l $(BUILDIR)/$*.lst $<
 
 $(PRG): $(OBJECTS) $(CFG)
