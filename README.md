@@ -85,7 +85,7 @@ src/
 
 **Memory map.** The VIC-II runs in bank 2 (bitmap `$a000`, matrix `$8c00`);
 converted graphics are packed by the host into every free RAM window
-(`$4100-$8bff`, `$9000-$9fff`, `$c000-$cfff`, `$e000-$efff`) and addressed
+(`$4900-$8bff`, `$9000-$9fff`, `$c000-$cfff`, `$e000-$efff`) and addressed
 through generated absolute-pointer tables. The `$e000` window loads inside
 the PRG's bitmap area and is copied up at init, so the whole game is a
 single ~51KB PRG. A stock C64 is nearly full with one level resident —
