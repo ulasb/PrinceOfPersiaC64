@@ -178,3 +178,5 @@ IN_SHIFT = 16
 zp_tcnt     = $6a           ; frames until next game tick
 zp_fcol     = $6b           ; fronts_near_kid scan origin
 zp_frow     = $6c
+zp_vskip    = $6d           ; blit: crop N rows off the image top (one-shot)
+zp_lvdone   = $6e           ; nextlevel event latched

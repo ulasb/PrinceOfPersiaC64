@@ -8,9 +8,10 @@
         .export game_tick, kid_spawn
         .export kid_getcol, div14, mul14, k_tile, k_isfloor, k_isbarrier
         .export floor_y_row, row_from_y16
-        .import lv_tile, lv_link, LEVEL
+        .import lv_tile, lv_spec, lv_link, LEVEL
         .import kid_animate, kid_start_seq, kid_frame_chk
         .import kid_control
+        .import tiles_tick, tiles_reset, shake_loose, press_plate
         .import SEQ_stand, SEQ_stepfall, SEQ_hardbump, SEQ_bump
         .import SEQ_softland, SEQ_medland, SEQ_hardland
         .import SEQ_runjump, SEQEND_runjump, SEQ_standjump, SEQEND_standjump
@@ -69,9 +70,18 @@ k_isfloor:
 ; carry set if (A=col, X=row) is a barrier
 k_isbarrier:
         jsr k_tile
+        cmp #T_GATE
+        beq @gate
         tax
         lda BARRFLAG,x
         cmp #1
+        rts
+@gate:  jsr lv_spec             ; gate position; passable from 112 up
+        cmp #112
+        bcc @barr
+        clc
+        rts
+@barr:  sec
         rts
 
 ; divide zp_x16 (s16) by 14 -> A = col (s8), zp_xrem = remainder
@@ -222,6 +232,7 @@ game_tick:
         lda zp_dead_t
         cmp #30
         bcc @cont               ; play out the death animation
+        jsr tiles_reset         ; restore the level, then respawn
         jmp kid_spawn
 @alive: lda #0
         sta zp_dead_t
@@ -284,6 +295,26 @@ game_tick:
         sta kid_hp
         SEQSET SEQ_hardland
 @rows_ok:
+        ; sequence events: floor jars and reaching the exit
+        lda kid_events
+        and #2                  ; nextlevel
+        beq :+
+        lda #1
+        sta zp_lvdone
+:       lda kid_events
+        and #4                  ; jaru: rattle loose floors above
+        beq :+
+        lda kid_row
+        sec
+        sbc #1
+        jsr jar_floors
+:       lda kid_events
+        and #8                  ; jard: rattle this row
+        beq :+
+        lda kid_row
+        jsr jar_floors
+:       jsr check_plates
+        jsr tiles_tick
         lda #0
         sta kid_events
         lda kid_room
@@ -293,6 +324,60 @@ game_tick:
         sta zp_visroom
         lda #1
         sta zp_moved
+@done:  rts
+
+; rattle every loose floor on row A of the kid's room (jaru/jard)
+jar_floors:
+        sta zp_tmp+3
+        lda #0
+        sta zp_tmp+2            ; col
+@loop:  lda kid_room
+        sta zp_rm
+        lda zp_tmp+2
+        sta zp_tc
+        lda zp_tmp+3
+        sta zp_tr
+        jsr shake_loose
+        inc zp_tmp+2
+        lda zp_tmp+2
+        cmp #10
+        bne @loop
+        rts
+
+; feet on the ground press plates and shake loose floors (check bit set)
+check_plates:
+        jsr kid_frame_chk
+        and #$40
+        bne :+
+        rts
+:       lda kid_action
+        cmp #ACT_STAND
+        beq @on
+        cmp #ACT_MOVE
+        beq @on
+        cmp #ACT_BUMPED
+        beq @on
+        rts
+@on:    jsr kid_getcol
+        sta zp_tc
+        lda kid_room
+        sta zp_rm
+        lda kid_row
+        sta zp_tr
+        jsr lv_tile
+        cmp #T_PRESS
+        beq @plate
+        cmp #T_UPRESS
+        beq @plate
+        cmp #T_DPRESS
+        beq @plate
+        cmp #T_LOOSE
+        bne @done
+        lda kid_action
+        cmp #ACT_MOVE
+        bne @done
+        jmp shake_loose
+@plate: jmp press_plate
 @done:  rts
 
 ; kid_x += sext(A)
@@ -725,6 +810,14 @@ land:
         sta kid_yvel
         lda #ACT_BUMPED
         sta kid_action
+        ; landing on a loose floor rattles it
+        jsr kid_getcol
+        sta zp_tc
+        lda kid_room
+        sta zp_rm
+        lda kid_row
+        sta zp_tr
+        jsr shake_loose
         lda zp_vel
         cmp #OOF_VEL
         bcs @hard1

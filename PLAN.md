@@ -72,8 +72,10 @@ onto the C64 fixed multicolor set per 4×8 cell — needs experimentation in Pha
 - [x] **4. Movement & collision** — full control layer (jumps, climbs, hang,
       falls, damage thresholds), barrier collision, room transitions with
       camera cuts
-- [ ] **5. Tile machinery** — plates→gates wiring, exit door, loose floors,
-      spikes, slicers, potions, sword pickup
+- [x] **5. Tile machinery** — plates→gates wiring, exit door, loose floors
+      with falling debris, level reset via first-touch backup; Level 1 is
+      completable end-to-end (spikes/slicers/potions/sword still pending —
+      they ride along with the guard build)
 - [ ] **6. Guards & combat** — guard AI (skill table), engarde, strike/parry/
       block, health, per-level guard variants
 - [ ] **7. Game flow** — title, HUD (health/level/time), death/restart, level

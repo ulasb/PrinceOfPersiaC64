@@ -8,8 +8,11 @@
 
         .include "pop.inc"
 
-        .export draw_room, draw_foreground, draw_front_block, piece_at
+        .export draw_room, draw_foreground, draw_front_block, draw_block
+        .export piece_at, clear_block_rect, set_room_ptr
         .import blit_ll, lv_tile, lv_spec
+        .import loose_state
+        .import BG_GATELIFT
         .import IMG_BG1_LO, IMG_BG1_HI, IMG_BG2_LO, IMG_BG2_HI
         .import BG_PIECEA, BG_PIECEAY, BG_PIECEB, BG_PIECEBY, BG_PIECEC
         .import BG_PIECED, BG_FRONTI, BG_FRONTY, BG_FRONTX
@@ -24,6 +27,7 @@
 zp_tb     = $36             ; B-section neighbour tile
 zp_gcol   = $37             ; gate draw column index
 zp_segh   = $38             ; gate segment height
+zp_glift  = $39             ; gate bar lift for the current position
 
         .segment "RODATA"
 ; x = PLAYFIELD_X + col*TILE_W for col -1..12 (index col+1)
@@ -244,6 +248,7 @@ sect_c:
         lda BG_PANELC,x
         jmp piece_c_at
 @c_gate:
+        jsr lv_spec             ; gate position
         jmp gate_c
 @c_none:
         rts
@@ -279,8 +284,9 @@ sect_b:
         cmp #T_FLOOR
         beq @b_floor
         cmp #T_SPACE
-        beq @b_space
-        ; default: PIECEB + signed PIECEBY
+        bne :+
+        jmp @b_space
+:       ; default: PIECEB + signed PIECEBY
         tax
         lda BG_PIECEB,x
         sta zp_pid
@@ -318,9 +324,13 @@ sect_b:
         jsr set_by_ay
         jmp @b_draw
 @b_loose:
+        jsr loose_state         ; wiggle index (coords still in zp_tc/tr)
+        tax
         lda #$1b                ; LOOSE_B
         sta zp_pid
         jsr set_by_ay
+        lda BG_LOOSEBY,x
+        jsr add_by
         lda #<-1
         jsr add_by
         jmp @b_draw
@@ -328,7 +338,7 @@ sect_b:
         ldx zp_dcol             ; drawn into this block
         inx
         stx zp_gcol
-        jmp gate_b
+        jmp gate_b              ; zp_spec = position (lv_spec ran above)
 @b_floor:
         lda zp_spec
         cmp #4
@@ -375,10 +385,12 @@ sect_a:
         cmp #T_TORCH
         beq @a_torch
         cmp #T_EXIT
-        beq @a_exit
-        cmp #T_EXIT2
-        beq @a_exit2
-        cmp #T_SLICER
+        bne :+
+        jmp @a_exit
+:       cmp #T_EXIT2
+        bne :+
+        jmp @a_exit2
+:       cmp #T_SLICER
         bne :+
         jmp @a_slicer
 :       cmp #T_FLASK
@@ -413,9 +425,18 @@ sect_a:
         lda BG_SPIKEA,x
         jmp piece_a_at
 @a_loose:
-        ldx #0
+        jsr loose_state
+        tax
         lda BG_LOOSEA,x
-        jmp piece_a_at
+        sta zp_pid
+        jsr set_by_ay
+        lda BG_LOOSEBY,x
+        jsr add_by
+        lda zp_pid
+        ldx zp_dcol
+        inx
+        ldy #0
+        jmp piece_at
 @a_torch:
         ldx #T_TORCH
         lda BG_PIECEA,x
@@ -443,8 +464,27 @@ sect_a:
         ldx #T_FLOOR
         lda BG_PIECEA,x
         jsr piece_a_at
-        lda #$6c                ; EXIT_DOOR (closed)
-        jsr piece_a_at
+        jsr lv_spec             ; door lift = min(spec, 40)
+        cmp #41
+        bcc :+
+        lda #40
+:       sta zp_vskip            ; crop the top as the door slides up
+        sta zp_tmp
+        lda #$6c                ; EXIT_DOOR
+        sta zp_pid
+        jsr set_by_ay
+        sec
+        lda zp_by
+        sbc zp_tmp
+        sta zp_by
+        lda zp_by+1
+        sbc #0
+        sta zp_by+1
+        lda zp_pid
+        ldx zp_dcol
+        inx
+        ldy #0
+        jsr piece_at
         lda #$6e                ; EXIT_TOP
         sta zp_pid
         jsr set_by_ay
@@ -505,9 +545,22 @@ sect_d:
         lda BG_BLOCKD,x
         jmp piece_d_at
 @d_loose:
-        ldx #0
+        lda zp_dcol
+        sta zp_tc
+        lda zp_drow
+        sta zp_tr
+        jsr loose_state
+        tax
         lda BG_LOOSED,x
-        jmp piece_d_at
+        sta zp_pid
+        jsr set_by_dy
+        lda BG_LOOSEBY,x
+        jsr add_by
+        lda zp_pid
+        ldx zp_dcol
+        inx
+        ldy #0
+        jmp piece_at
 @d_slicer:
         ldx #T_FLOOR
         lda BG_PIECED,x
@@ -543,6 +596,8 @@ piece_c_at:
 ; Closed gate (pos 0). B-strip: segments from block_bot(drow)-16 up to
 ; block_top(drow)-8, then the bottom piece. Draw column = zp_gcol.
 gate_b:
+        jsr gate_lift           ; A = bar lift for zp_spec
+        sta zp_glift
         ldx zp_drow
         inx
         sec
@@ -553,6 +608,13 @@ gate_b:
         sbc #0
         sta zp_gy+1
         sec
+        lda zp_gy
+        sbc zp_glift
+        sta zp_gy
+        lda zp_gy+1
+        sbc #0
+        sta zp_gy+1
+        sec
         lda BTOPLO,x
         sbc #8
         sta zp_gtop
@@ -560,7 +622,7 @@ gate_b:
         sbc #0
         sta zp_gtop+1
         jsr gate_segments_b
-        ; bottom piece at gy+4 (zp_gy is back at the strip bottom)
+        ; bottom piece at strip bottom + 4
         ldx zp_drow
         inx
         sec
@@ -570,10 +632,29 @@ gate_b:
         lda BBOTHI,x
         sbc #0
         sta zp_by+1
+        sec
+        lda zp_by
+        sbc zp_glift
+        sta zp_by
+        lda zp_by+1
+        sbc #0
+        sta zp_by+1
         lda #$44                ; GATEBOT_ORA
         ldx zp_gcol
         ldy #0
         jmp piece_at
+
+; bar lift in px for gate position zp_spec (255 = jammed open)
+gate_lift:
+        lda zp_spec
+        cmp #188
+        bcc :+
+        lda #188
+:       lsr
+        lsr
+        tax
+        lda BG_GATELIFT,x
+        rts
 
 ; segment walker: draws GATE8B[7] every seg-height from zp_gy up to zp_gtop
 gate_segments_b:
@@ -625,6 +706,8 @@ gate_segments:
 
 ; C-strip of a gate at (dcol-1, drow+1): the bars visible in this block.
 gate_c:
+        jsr gate_lift
+        sta zp_glift
         ldx zp_drow
         inx
         inx                     ; gate row index (drow+1)+1
@@ -633,6 +716,13 @@ gate_c:
         sbc #16
         sta zp_gy
         lda BBOTHI,x
+        sbc #0
+        sta zp_gy+1
+        sec
+        lda zp_gy
+        sbc zp_glift
+        sta zp_gy
+        lda zp_gy+1
         sbc #0
         sta zp_gy+1
         ; y = min(bottom, block_top(gate row)+2)
@@ -698,6 +788,7 @@ draw_front_block:
         lda zp_t
         cmp #T_GATE
         bne @done
+        jsr lv_spec             ; gate position
         ldx zp_dcol
         inx
         inx                     ; bars drawn into the block to the right
@@ -709,3 +800,172 @@ draw_front_block:
         lda BG_SLICERFRNT,x
         jsr piece_a_at
         rts
+
+; ------------------------------------------------------------- helpers
+set_room_ptr:
+        lda zp_visroom
+        sta zp_rm
+        rts
+
+; clear the 14x63 pixel rect of block (A=col s8, X=row s8), clamped
+zp_cx0   = $9d              ; shared with tiles.s scratch (sequential use)
+zp_cbc   = $9e
+zp_cy    = $9f
+clear_block_rect:
+        ; row range: block_top(row)..block_bot(row), clip 0..191
+        cpx #$fe
+        bne :+
+        rts                     ; row -2: nothing visible
+:       stx zp_tmp
+        pha
+        txa
+        clc
+        adc #1
+        tax
+        cpx #5
+        bcc :+
+        pla
+        rts
+:       lda BTOPLO,x
+        sta zp_cy
+        lda BTOPHI,x
+        bmi @clip_top
+        beq @top_ok
+        pla
+        rts                     ; entirely below the screen
+@clip_top:
+        lda #0
+        sta zp_cy
+@top_ok:
+        lda BBOTLO,x
+        sta zp_gtop             ; reuse as bottom bound
+        lda BBOTHI,x
+        beq :+
+        lda #191
+        sta zp_gtop
+:       lda zp_gtop
+        cmp #192
+        bcc :+
+        lda #191
+        sta zp_gtop
+:       ; columns
+        pla                     ; col
+        clc
+        adc #1
+        tax
+        lda COLXLO,x            ; x0 = 10 + 14*col (never negative for col>=-1... col -1 -> -4)
+        sta zp_cx0
+        lda COLXHI,x
+        bpl :+
+        ; col -1: x0 = -4: clip to 0
+        lda #0
+        sta zp_cx0
+:       lda zp_cx0
+        cmp #160
+        bcc :+
+        rts
+:       ; last pixel x1 = min(x0raw+13, 159); recompute from table + 13
+        lda COLXLO,x
+        clc
+        adc #13
+        sta zp_cbc              ; x1 (low byte fine: <= 177)
+        lda COLXHI,x
+        adc #0
+        beq :+
+        lda #159
+        sta zp_cbc              ; (only col -1 has hi<0; +13 keeps hi $ff -> treat as small)
+:       lda zp_cbc
+        cmp #160
+        bcc :+
+        lda #159
+        sta zp_cbc
+:       ; per-row clear from zp_cy to zp_gtop
+@row:   ldx zp_cy
+        lda ROWLO,x
+        sta zp_dst
+        lda ROWHI,x
+        sta zp_dst+1
+        ; first byte: keep pixels left of x0
+        lda zp_cx0
+        lsr
+        lsr
+        sta zp_tmp              ; bc0
+        lda zp_cbc
+        lsr
+        lsr
+        sta zp_tmp+1            ; bc1
+        ; y offset for indirect: byte column * 8
+        lda zp_tmp
+        asl
+        asl
+        asl
+        tay
+        lda zp_tmp
+        cmp zp_tmp+1
+        beq @single
+        ; first byte
+        lda zp_cx0
+        and #3
+        tax
+        lda (zp_dst),y
+        and LMASK,x
+        sta (zp_dst),y
+        ; middle bytes
+        lda zp_tmp
+        clc
+        adc #1
+@mid:   cmp zp_tmp+1
+        beq @last
+        pha
+        tya
+        clc
+        adc #8
+        tay
+        lda #0
+        sta (zp_dst),y
+        pla
+        clc
+        adc #1
+        bne @mid
+@last:  tya
+        clc
+        adc #8
+        tay
+        lda zp_cbc
+        and #3
+        tax
+        inx                     ; e = (x1&3)+1
+        lda (zp_dst),y
+        and RMASK,x
+        sta (zp_dst),y
+        jmp @nextrow
+@single:
+        lda zp_cx0
+        and #3
+        tax
+        lda LMASK,x
+        sta zp_tmp
+        lda zp_cbc
+        and #3
+        tax
+        inx
+        lda RMASK,x
+        ora zp_tmp
+        tax
+        lda (zp_dst),y
+        sta zp_tmp
+        txa
+        and zp_tmp
+        sta (zp_dst),y
+@nextrow:
+        lda zp_cy
+        cmp zp_gtop             ; just cleared the last row?
+        bcc :+
+        rts
+:       inc zp_cy
+        jmp @row
+
+        .segment "RODATA"
+LMASK:  .byte $00,$c0,$f0,$fc   ; keep pixels left of x&3
+RMASK:  .byte $ff,$3f,$0f,$03,$00 ; keep pixels right of the last used one
+        .segment "CODE"

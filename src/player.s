@@ -17,6 +17,8 @@
         .import SEQ_step1, SEQ_step2, SEQ_step3, SEQ_step4, SEQ_step5
         .import SEQ_step6, SEQ_step7, SEQ_step8, SEQ_step9, SEQ_step10
         .import SEQ_step11, SEQ_step12, SEQ_step13
+        .import SEQ_climbstairs
+        .import lv_tile, lv_spec
 
 ; local zeropage
 zp_c      = $88             ; scratch column
@@ -100,6 +102,24 @@ control_stand:
         lda zp_input
         and #IN_UP
         beq @notup
+        ; an open exit here? walk up the stairs and out
+        jsr kid_getcol
+        sta zp_tc
+        lda kid_room
+        sta zp_rm
+        lda kid_row
+        sta zp_tr
+        jsr lv_tile
+        cmp #T_EXIT
+        beq @exit
+        cmp #T_EXIT2
+        bne @noexit
+@exit:  jsr lv_spec
+        cmp #20                 ; door open enough
+        bcc @noexit
+        SEQSET SEQ_climbstairs
+        rts
+@noexit:
         ; up: climb if no direction, else standing jump
         lda zp_d
         bne @upjump

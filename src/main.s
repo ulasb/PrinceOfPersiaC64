@@ -7,6 +7,7 @@
         .import gfxh_start, gfxh_end
         .import char_init, kid_draw, kid_restore
         .import game_tick, kid_spawn, kid_getcol
+        .import tiles_init, tiles_reset, tiles_redraw, draw_falling
 
         .segment "LOADADDR"
         .addr   $0801
@@ -104,9 +105,12 @@ entry:
 
         jsr blit_init
         jsr char_init
+        jsr tiles_init
         lda #0
         sta zp_frame
         sta zp_previn
+        sta zp_vskip
+        sta zp_lvdone
         lda #3
         sta zp_tcnt
 .ifdef TESTSCRIPT
@@ -142,6 +146,15 @@ mainloop:
 
         jsr game_tick
 
+        ; reached the exit: flash and restart the level
+        lda zp_lvdone
+        beq @notdone
+        jsr victory_flash
+        lda #0
+        sta zp_lvdone
+        jsr tiles_reset
+        jsr kid_spawn
+@notdone:
         ; room change: full redraw
         lda zp_moved
         beq @noredraw
@@ -155,6 +168,8 @@ mainloop:
         jmp @drawkid
 @noredraw:
         jsr kid_restore
+        jsr tiles_redraw
+        jsr draw_falling
 @drawkid:
         lda kid_room
         cmp zp_visroom
@@ -170,6 +185,24 @@ mainloop:
 invalidate_save:
         lda #0
         sta $79                 ; sv_valid (char.s)
+        rts
+
+; white border flourish on finishing the level
+victory_flash:
+        ldx #0
+@fl:    lda #1
+        sta $d020
+        ldy #0
+@d1:    dey
+        bne @d1
+        lda #0
+        sta $d020
+        ldy #0
+@d2:    dey
+        bne @d2
+        inx
+        cpx #150
+        bne @fl
         rts
 
 ; redraw foreground pieces on the 3x3 blocks around the kid so he appears
@@ -257,14 +290,17 @@ dbgsrc: .addr kid_frame, kid_action, kid_x, kid_x+1, kid_y, kid_y+1
         .addr kid_row, kid_seq, kid_seq+1, zp_input
 dbgsrc_end:
 
-; scripted input for headless runs: (tick count, input byte) pairs,
-; count 0 ends the script (input stays 0)
+; scripted input for headless runs: (tick count, input byte) pairs.
+; count 0 ends the script; count $fe = seek: careful-step until the kid
+; stands on column <value>, then advance (closed-loop positioning).
 read_input:
         lda script_left
         bne @feed
         ldx script_idx
         lda tscript,x
         beq @off                ; terminator
+        cmp #$fe
+        beq @seek
         sta script_left
         lda tscript+1,x
         sta script_val
@@ -278,13 +314,56 @@ read_input:
 @off:   lda #0
         sta zp_input
         rts
+@seek:  ; only act from a standing frame; otherwise idle this tick
+        lda kid_frame
+        cmp #15
+        beq :+
+        lda #0
+        sta zp_input
+        rts
+:       jsr kid_getcol
+        ldx script_idx
+        cmp tscript+1,x
+        bne @step
+        inx                     ; arrived: consume the entry
+        inx
+        stx script_idx
+        lda #0
+        sta zp_input
+        rts
+@step:  ; one careful step toward the target
+        bcc @right              ; kid col < target
+        lda #IN_SHIFT|IN_LEFT
+        sta zp_input
+        rts
+@right: lda #IN_SHIFT|IN_RIGHT
+        sta zp_input
+        rts
 
 tscript:
-        .byte 6, 0              ; settle (entry drop)
-        .byte 40, IN_RIGHT      ; off the ledge to the bottom corridor
+        .byte 6, 0              ; entry drop
+        .byte 40, IN_RIGHT      ; to the bottom row, over the loose tile
+        .byte 24, 0             ; loose floor breaks
+        .byte 20, IN_LEFT       ; into the hole, fall to room 2
+        .byte 16, 0
+        .byte 200, IN_RIGHT     ; rooms 2 -> 3 -> 9, bump the right wall
         .byte 12, 0
-        .byte 200, IN_LEFT      ; run left through the room link
-        .byte 30, 0
+        .byte $fe, 1            ; seek the column beside the plate pillar
+        .byte 4, 0
+        .byte 30, IN_UP|IN_SHIFT ; climb onto the pressure plate
+        .byte 10, 0
+        .byte 30, IN_UP|IN_SHIFT ; (second try if the first grab slipped)
+        .byte 40, 0             ; stand on the plate; exit door opens
+        .byte 14, IN_RIGHT      ; run off the plate, drop to the corridor
+        .byte 14, 0
+        .byte $fe, 3            ; seek the exit stairs tile
+        .byte 4, 0
+        .byte 12, IN_UP         ; up the stairs!
+        .byte 20, 0
+        .byte $fe, 4            ; (or the second door tile)
+        .byte 4, 0
+        .byte 12, IN_UP
+        .byte 150, 0            ; victory
         .byte 0
 
         .segment "BSS"

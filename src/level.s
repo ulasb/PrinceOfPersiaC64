@@ -6,7 +6,7 @@
 
         .include "pop.inc"
 
-        .export lv_tile, lv_spec, lv_link, LEVEL
+        .export lv_tile, lv_spec, lv_link, lv_resolve, lv_calc, LEVEL
 
         .segment "RODATA"
 LEVEL:  .incbin "../assets/levels/level01.bin"

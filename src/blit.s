@@ -108,7 +108,8 @@ blit_init:
         rts
 
 ; -------------------------------------------------------------- blit_ll
-; in: zp_img -> image, zp_bx s16 x (mc px), zp_by s16 bottom y
+; in: zp_img -> image, zp_bx s16 x (mc px), zp_by s16 bottom y;
+; zp_vskip: crop this many rows off the TOP of the image (sliding doors)
 blit_ll:
         ldy #0
         lda (zp_img),y
@@ -117,6 +118,10 @@ blit_ll:
 :       sta zp_wb
         iny
         lda (zp_img),y
+        sec
+        sbc zp_vskip
+        bcc @off1
+        beq @off1
         sta zp_h
         clc
         lda zp_img
@@ -125,6 +130,25 @@ blit_ll:
         lda zp_img+1
         adc #0
         sta zp_src+1
+        ; skip cropped top rows in the source
+        ldx zp_vskip
+        beq @noskip0
+@skip0: clc
+        lda zp_src
+        adc zp_wb
+        sta zp_src
+        bcc :+
+        inc zp_src+1
+:       dex
+        bne @skip0
+@noskip0:
+        lda #0                  ; vskip is one-shot
+        sta zp_vskip
+        jmp @cont
+@off1:  lda #0
+        sta zp_vskip
+        rts
+@cont:
 
         ; top = by - (h-1); clip top
         ldx zp_h

@@ -35,6 +35,11 @@ def main():
         lines.append(f"BG_{name}:")
         lines.append("        .byte " + ",".join(
             f"${v & 0xff:02x}" for v in vals))
+    # gate bar lift in px for position>>2 (pos*44/188, pos 0..188)
+    lines.append("        .export BG_GATELIFT")
+    lines.append("BG_GATELIFT:")
+    lines.append("        .byte " + ",".join(
+        f"${min(i * 4, 188) * 44 // 188:02x}" for i in range(48)))
     out = HERE / "src" / "data" / "bgdata.s"
     out.write_text("\n".join(lines) + "\n")
     print(f"wrote {out.relative_to(HERE)} "

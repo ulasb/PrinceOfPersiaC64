@@ -36,6 +36,35 @@ sys.path.insert(0, str(HERE.parent / "PrinceOfPersiaPy" / "src"))
 from data import framedefs  # noqa: E402
 
 
+def reachable_bg(table_bit7):
+    """Piece ids reachable from the BGDATA tables (dungeon set)."""
+    sys.path.insert(0, str(HERE.parent / "PrinceOfPersiaPy" / "src"))
+    from graphics import bgdata as BG
+    used = set()
+    for name in ["PIECEA", "PIECEB", "PIECEC", "PIECED", "FRONTI", "BSTRIPE",
+                 "GATE8B", "GATE8C", "SPIKEA", "SPIKEB", "LOOSEA", "LOOSED",
+                 "SLICERTOP", "SLICERBOT", "SLICERFRNT", "BLOCKB", "BLOCKC",
+                 "BLOCKD", "BLOCKFR", "PANELB", "PANELC", "SPACEB", "FLOORB",
+                 "TORCHFLAME"]:
+        used.update(getattr(BG, name))
+    for c in ["GATEBOT_STA", "GATEBOT_ORA", "GATE_B1", "EXIT_STAIRS",
+              "EXIT_DOOR", "EXIT_TOP", "LOOSE_B", "SPECIALFLASK",
+              "SWORDGLEAM0", "SWORDGLEAM1"]:
+        used.add(getattr(BG, c))
+    used.discard(0)
+    if table_bit7:
+        return {u & 0x7F for u in used if u & 0x80}
+    return {u for u in used if not (u & 0x80)}
+
+
+def bg1_reachable():
+    return reachable_bg(False)
+
+
+def bg2_reachable():
+    return reachable_bg(True)
+
+
 def ch3_movement_images():
     """CH3 images used by non-combat kid frames (landings, crouches);
     the sword-fight frames (121-149) wait for the combat build."""
@@ -184,13 +213,13 @@ def load_table(table_name: str, palette_hue: bool):
 # C64 RAM windows around VIC bank 2 (matrix $8c00, bitmap $a000-$bf3f).
 # GFXH loads into the bitmap hole in the PRG and is copied to $e000 at init;
 # $f000+ holds the blit tables and character buffers (see pop.inc).
-WINDOWS = [("GFX1", 0x4100, 0x8C00), ("GFX9", 0x9000, 0xA000),
+WINDOWS = [("GFX1", 0x4900, 0x8C00), ("GFX9", 0x9000, 0xA000),
            ("GFXC", 0xC000, 0xD000), ("GFXH", 0xE000, 0xF000)]
 
 # demo set: dungeon backgrounds + kid tables. CH3 is filtered to movement
 # frames; CHTAB5 (deaths, potions) doesn't fit yet — see PLAN.md.
-PACK_SET = [("BG1", "IMG.BGTAB1.DUN", False, None),
-            ("BG2", "IMG.BGTAB2.DUN", False, None),
+PACK_SET = [("BG1", "IMG.BGTAB1.DUN", False, bg1_reachable),
+            ("BG2", "IMG.BGTAB2.DUN", False, bg2_reachable),
             ("CH1", "IMG.CHTAB1", True, None),
             ("CH2", "IMG.CHTAB2", True, None),
             ("CH3", "IMG.CHTAB3", True, ch3_movement_images)]

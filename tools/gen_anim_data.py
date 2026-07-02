@@ -82,12 +82,7 @@ def emit_framedef():
     ]
     fields = ("IMAGE", "SWORD", "DX", "DY", "CHK")
     lines += parallel_tables("FD_MAIN", framedefs.MAIN, fields)
-    lines += parallel_tables("FD_ALT1", framedefs.ALTSET1, fields)
-    lines += parallel_tables("FD_ALT2", framedefs.ALTSET2, fields)
-    swfields = tuple(
-        ("F0", "F1", "F2", "F3", "F4")[: len(next(iter(framedefs.SWORDTAB.values())))]
-    )
-    lines += parallel_tables("SWORDTAB", framedefs.SWORDTAB, swfields)
+    # ALTSET1/ALTSET2/SWORDTAB return with the guard & combat build
     lines.append("")
     return "\n".join(lines)
 

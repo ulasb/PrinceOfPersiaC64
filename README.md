@@ -12,9 +12,10 @@ behavioral ground truth for this port.
 
 ![Level 1 on the C64](docs/screenshots/level1_start.png)
 
-## Status: playable demo
+## Status: Level 1 playable start to finish
 
-Level 1 renders and the kid is fully controllable with a joystick:
+Level 1 renders and plays with a joystick — from the opening drop out of
+the entrance gate to climbing the exit stairs:
 
 - **Room rendering** from the original 2304-byte level blueprints, using the
   original BGDATA piece tables and the original drawing model (each block
@@ -26,11 +27,18 @@ Level 1 renders and the kid is fully controllable with a joystick:
   crouching, climbing up and down, hanging from ledges, mid-air ledge grabs,
   falling with the original damage thresholds, wall and gate collision —
   including Level 1's iconic opening drop out of the entrance gate
-- Headless test harness (scripted input + screenshot + memory inspection)
+- **Tile machinery**: loose floors that shake, break and fall as debris,
+  pressure plates driving gates and the exit door through the original
+  LINKLOC/LINKMAP wiring, gates that rise/slam with the original state
+  machine, the sliding exit door, and finishing the level up the stairs;
+  death or victory restores the level from a first-touch mutation log
+- Headless test harness: scripted input (with a closed-loop "walk to
+  column" opcode), VICE remote-monitor state dumps, screenshot verification
 
-Not yet: tile machinery (loose floors, pressure plates, gates — this is
-what gates progression past the first room), guards and sword combat, sound,
-HUD, the other 13 levels. See [PLAN.md](PLAN.md) for the roadmap.
+![The exit door, opened by the pressure plate](docs/screenshots/exit_open.png)
+
+Not yet: guards and sword combat, spikes/slicers/potions, sound, HUD, the
+other 13 levels. See [PLAN.md](PLAN.md) for the roadmap.
 
 ![Falling off the ledge](docs/screenshots/ledge_fall.png)
 
