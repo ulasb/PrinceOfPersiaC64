@@ -8,7 +8,7 @@
 
         .include "pop.inc"
 
-        .export draw_room, draw_foreground, piece_at
+        .export draw_room, draw_foreground, draw_front_block, piece_at
         .import blit_ll, lv_tile, lv_spec
         .import IMG_BG1_LO, IMG_BG1_HI, IMG_BG2_LO, IMG_BG2_HI
         .import BG_PIECEA, BG_PIECEAY, BG_PIECEB, BG_PIECEBY, BG_PIECEC

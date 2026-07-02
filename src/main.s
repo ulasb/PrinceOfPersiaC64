@@ -2,8 +2,11 @@
 
         .include "pop.inc"
 
-        .import blit_init, draw_room, draw_foreground, LEVEL
+        .import blit_init, draw_room, draw_foreground, draw_front_block
+        .import LEVEL
         .import gfxh_start, gfxh_end
+        .import char_init, kid_draw, kid_restore
+        .import game_tick, kid_spawn, kid_getcol
 
         .segment "LOADADDR"
         .addr   $0801
@@ -62,19 +65,19 @@ entry:
         dex
         bne @copy
 
-        ; VIC: bank 1 ($4000), bitmap $6000, matrix $5c00, multicolor
+        ; VIC: bank 2 ($8000), bitmap $a000, matrix $8c00, multicolor
         lda $dd02
         ora #$03
         sta $dd02
         lda $dd00
         and #$fc
-        ora #$02
+        ora #$01
         sta $dd00
         lda #$3b                ; bitmap mode on
         sta $d011
         lda #$d8                ; multicolor
         sta $d016
-        lda #$78                ; matrix $5c00, bitmap $6000
+        lda #$38                ; matrix $8c00, bitmap $a000
         sta $d018
         lda #0
         sta $d020
@@ -95,15 +98,210 @@ entry:
         inx
         bne @cols
 
-        jsr blit_init
+        ; CIA port A as input for joystick 2
+        lda #0
+        sta $dc02
 
-        ; draw the kid's starting room
-        lda LEVEL+LV_INFO+64
+        jsr blit_init
+        jsr char_init
+        lda #0
+        sta zp_frame
+        sta zp_previn
+.ifdef TESTSCRIPT
+        sta script_idx
+        sta script_left
+        sta script_val
+.endif
+        jsr kid_spawn
+
+; ---------------------------------------------------------- main loop
+mainloop:
+        ; wait for the vblank raster line
+@wait:  lda $d012
+        cmp #251
+        bne @wait
+@wait2: lda $d012
+        cmp #251
+        beq @wait2              ; make sure we pass it only once
+        inc zp_frame
+        lda zp_frame
+        and #3
+        beq @tick
+        jmp mainloop
+@tick:
+        jsr read_input
+        lda zp_previn
+        eor #$ff
+        and zp_input
+        sta zp_inedge
+        lda zp_input
+        sta zp_previn
+
+        jsr game_tick
+
+        ; room change: full redraw
+        lda zp_moved
+        beq @noredraw
+        lda #0
+        sta zp_moved
+        jsr invalidate_save
+        lda zp_visroom
         sta zp_room
         jsr draw_room
         jsr draw_foreground
+        jmp @drawkid
+@noredraw:
+        jsr kid_restore
+@drawkid:
+        lda kid_room
+        cmp zp_visroom
+        bne @nokid
+        jsr kid_draw
+        jsr fronts_near_kid
+@nokid:
+.ifdef TESTSCRIPT
+        jsr dbg_dump
+.endif
+        jmp mainloop
 
-hang:   jmp hang
+invalidate_save:
+        lda #0
+        sta $79                 ; sv_valid (char.s)
+        rts
+
+; redraw foreground pieces on the 3x3 blocks around the kid so he appears
+; behind posts, gates and pillar fronts
+fronts_near_kid:
+        lda zp_visroom
+        sta zp_rm
+        jsr kid_getcol
+        sec
+        sbc #1
+        sta zp_tmp+2            ; start col
+        lda kid_row
+        sec
+        sbc #1
+        sta zp_tmp+3            ; start row
+        ldx #0
+@rowl:  txa
+        clc
+        adc zp_tmp+3
+        cmp #$ff                ; -1 is a valid row
+        beq @rowok
+        cmp #3
+        bcs @nextrow
+@rowok: sta zp_drow
+        ldy #0
+@coll:  tya
+        clc
+        adc zp_tmp+2
+        cmp #$ff                ; -1 is a valid col
+        beq @colok
+        cmp #11
+        bcs @nextcol
+@colok: sta zp_dcol
+        tya
+        pha
+        txa
+        pha
+        jsr draw_front_block
+        pla
+        tax
+        pla
+        tay
+@nextcol:
+        iny
+        cpy #3
+        bne @coll
+@nextrow:
+        inx
+        cpx #3
+        bne @rowl
+        rts
+
+.ifdef TESTSCRIPT
+; dump kid state into the HUD strip as raw bitmap bytes (each state byte
+; fills one 4x8 cell; tools/read_debug.py decodes them from screenshots)
+DBGROW = BITMAP + 30*8       ; top row, cells 30-39
+dbg_dump:
+        ldx #0                  ; X = entry index * 2
+@next:  lda dbgsrc,x
+        sta zp_ptr
+        lda dbgsrc+1,x
+        sta zp_ptr+1
+        ldy #0
+        lda (zp_ptr),y
+        sta zp_tmp
+        txa
+        pha
+        asl
+        asl                     ; cell offset = (x/2)*8 = x*4
+        tay
+        lda zp_tmp
+        ldx #8
+@f8:    sta DBGROW,y
+        iny
+        dex
+        bne @f8
+        pla
+        tax
+        inx
+        inx
+        cpx #(dbgsrc_end - dbgsrc)
+        bcc @next
+        rts
+dbgsrc: .addr kid_frame, kid_action, kid_x, kid_x+1, kid_y, kid_y+1
+        .addr kid_row, kid_seq, kid_seq+1, zp_input
+dbgsrc_end:
+
+; scripted input for headless runs: (tick count, input byte) pairs,
+; count 0 ends the script (input stays 0)
+read_input:
+        lda script_left
+        bne @feed
+        ldx script_idx
+        lda tscript,x
+        beq @off                ; terminator
+        sta script_left
+        lda tscript+1,x
+        sta script_val
+        inx
+        inx
+        stx script_idx
+@feed:  dec script_left
+        lda script_val
+        sta zp_input
+        rts
+@off:   lda #0
+        sta zp_input
+        rts
+
+tscript:
+        .byte 6, 0              ; settle
+        .byte 4, IN_UP          ; jump up in place
+        .byte 20, 0
+        .byte 40, IN_RIGHT      ; run right, off the ledge, fall + land
+        .byte 15, 0
+        .byte 20, IN_LEFT       ; run left along the bottom corridor
+        .byte 4, IN_UP          ; try to climb the ledge above
+        .byte 40, IN_UP
+        .byte 30, 0
+        .byte 0
+
+        .segment "BSS"
+script_idx:  .res 1
+script_left: .res 1
+script_val:  .res 1
+        .segment "CODE"
+.else
+; joystick 2 (active low): bits 0-4 = up dn lt rt fire
+read_input:
+        lda $dc00
+        eor #$ff
+        and #$1f
+        sta zp_input
+        rts
+.endif
 
 int_stub:
         rti

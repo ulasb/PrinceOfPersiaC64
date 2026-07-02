@@ -24,12 +24,27 @@ Archive format (little-endian):
 """
 
 import struct
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parents[1]
 IMAGES = (HERE.parent / "PrinceOfPersiaPy" / "source_reference"
           / "01 POP Source" / "Images")
 OUT = HERE / "assets" / "gfx"
+
+sys.path.insert(0, str(HERE.parent / "PrinceOfPersiaPy" / "src"))
+from data import framedefs  # noqa: E402
+
+
+def ch3_movement_images():
+    """CH3 images used by non-combat kid frames (landings, crouches);
+    the sword-fight frames (121-149) wait for the combat build."""
+    used = set()
+    for f, (img, sword, _dx, _dy, _chk) in framedefs.MAIN.items():
+        table = ((img & 0x80) >> 5) | ((sword & 0xC0) >> 6)
+        if table == 2 and not 121 <= f <= 149:
+            used.add(img & 0x7F)
+    return used
 
 WARM, COOL, WHITE = 2, 3, 1
 
@@ -166,14 +181,19 @@ def load_table(table_name: str, palette_hue: bool):
     return images
 
 
-# C64 RAM windows around the VIC bank (matrix $5c00, bitmap $6000-$7f3f).
-# GFXH loads into the bitmap hole in the PRG and is copied to $e000 at init.
-WINDOWS = [("GFX1", 0x4000, 0x5C00), ("GFX2", 0x8000, 0xD000),
-           ("GFXH", 0xE000, 0xFFFA)]
+# C64 RAM windows around VIC bank 2 (matrix $8c00, bitmap $a000-$bf3f).
+# GFXH loads into the bitmap hole in the PRG and is copied to $e000 at init;
+# $f000+ holds the blit tables and character buffers (see pop.inc).
+WINDOWS = [("GFX1", 0x4100, 0x8C00), ("GFX9", 0x9000, 0xA000),
+           ("GFXC", 0xC000, 0xD000), ("GFXH", 0xE000, 0xF000)]
 
-# demo set: dungeon backgrounds + kid tables
-PACK_SET = [("BG1", "IMG.BGTAB1.DUN", False), ("BG2", "IMG.BGTAB2.DUN", False),
-            ("CH1", "IMG.CHTAB1", True), ("CH2", "IMG.CHTAB2", True)]
+# demo set: dungeon backgrounds + kid tables. CH3 is filtered to movement
+# frames; CHTAB5 (deaths, potions) doesn't fit yet — see PLAN.md.
+PACK_SET = [("BG1", "IMG.BGTAB1.DUN", False, None),
+            ("BG2", "IMG.BGTAB2.DUN", False, None),
+            ("CH1", "IMG.CHTAB1", True, None),
+            ("CH2", "IMG.CHTAB2", True, None),
+            ("CH3", "IMG.CHTAB3", True, ch3_movement_images)]
 
 
 def pack_windows():
@@ -181,8 +201,11 @@ def pack_windows():
     and src/data/gfxindex.s with absolute lo/hi address tables per archive."""
     blobs = {name: bytearray() for name, _, _ in WINDOWS}
     tables = {}
-    for label, table_name, hue in PACK_SET:
+    for label, table_name, hue, keep in PACK_SET:
         images = load_table(table_name, hue)
+        if keep is not None:
+            keep_set = keep()
+            images = {n: im for n, im in images.items() if n in keep_set}
         count = max(images) + 1
         addrs = [0] * count
         for n in sorted(images):

@@ -22,11 +22,11 @@ assets:
 	python3 tools/copy_levels.py
 	python3 tools/convert_gfx.py
 
-all: $(PRG)
+ASFLAGS ?=
 
 $(BUILDIR)/%.o: $(SRCDIR)/%.s
 	@mkdir -p $(dir $@)
-	$(AS) -g -o $@ -l $(BUILDIR)/$*.lst $<
+	$(AS) -g $(ASFLAGS) -o $@ -l $(BUILDIR)/$*.lst $<
 
 $(PRG): $(OBJECTS) $(CFG)
 	$(LD) -C $(CFG) -o $@ -m $(BUILDIR)/pop.map -Ln $(BUILDIR)/pop.lbl $(OBJECTS)

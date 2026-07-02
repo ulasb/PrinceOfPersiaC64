@@ -50,14 +50,17 @@ OOF_VEL     = 22
 
 ; ------------------------------------------------------------ memory map
 ; $0400 ROWLO, $0500 ROWHI (bitmap row address tables, y 0..199)
-; $4000-$5bff  gfx window 1        $5c00 VIC matrix   $6000 bitmap
-; $8000-$cffd  gfx window 2        $e000-$e7ff gfx window H (copied at init)
-; $e800-$efff  save-under buffers  $f000-$f7ff blit shift tables
+; $0801-$37ff  code + tables + level     $3800-$8bff gfx window 1
+; $8c00 VIC matrix (bank 2)              $9000-$9fff gfx window 9
+; $a000-$bf3f  bitmap                    $c000-$cfff gfx window C
+; $e000-$efff  gfx window H (copied at init from the bitmap load hole)
+; $f000-$f8ff  blit tables               $f900-$fcff char buffers
 ROWLO       = $0400
 ROWHI       = $0500
-VIC_MATRIX  = $5c00
-BITMAP      = $6000
-SAVEBUF     = $e800
+VIC_MATRIX  = $8c00
+BITMAP      = $a000
+SAVEBUF     = $f900         ; $f900-$faff save-under (8 cols x 64 rows)
+COMPOSE     = $fb00         ; $fb00-$fcff character frame compose buffer
 TAB_SHR2    = $f000         ; >>2
 TAB_SHR4    = $f100         ; >>4
 TAB_SHR6    = $f200         ; >>6
@@ -66,7 +69,7 @@ TAB_SHL4    = $f400         ; <<4
 TAB_SHL2    = $f500         ; <<2
 TAB_MASK    = $f600         ; AND-mask: 11 where 2px pair is 00
 ROWBUF      = $f700         ; shifted row scratch (17 bytes used)
-COMPOSE     = $e900         ; character frame compose buffer
+TAB_REV     = $f800         ; reverse the four 2px pairs in a byte
 
 ; ------------------------------------------------------------- zeropage
 zp_img      = $02           ; 2  piece/image data pointer
@@ -107,7 +110,67 @@ zp_gtop     = $33           ; 2
 zp_tmp      = $35           ; 4  scratch
 zp_ptr      = $3a           ; 2  generic pointer
 
-; character/tick state (later modules)
+; character/tick state
 zp_tick     = $40           ; 1  game tick counter
 zp_frame    = $41           ; 1  frame counter (50Hz)
-zp_input    = $42           ; 1  joystick bits: 0=up 1=down 2=left 3=right 4=btn
+zp_input    = $42           ; 1  bits: 0=up 1=down 2=left 3=right 4=shift
+zp_inedge   = $43           ; 1  newly pressed this tick (same bits)
+zp_previn   = $44           ; 1
+
+; the kid (Char struct)
+kid_room    = $50           ; 1
+kid_x       = $51           ; 2  s16 game px, room-local
+kid_y       = $53           ; 2  s16 feet scanline
+kid_row     = $55           ; 1  s8
+kid_face    = $56           ; 1  1 or $ff
+kid_action  = $57           ; 1
+kid_xvel    = $58           ; 1  s8
+kid_yvel    = $59           ; 1  s8
+kid_frame   = $5a           ; 1
+kid_seq     = $5b           ; 2  offset into SEQTABLE
+kid_alive   = $5d           ; 1
+kid_hp      = $5e           ; 1
+kid_hangt   = $5f           ; 1  hang tick counter
+kid_events  = $60           ; 1  bit0 die, bit1 nextlevel, bit2 jaru, bit3 jard
+kid_prevy   = $61           ; 2  y before this tick's motion
+
+; scratch for control/collision
+zp_col      = $63           ; 1  s8 current column of kid_x
+zp_xrem     = $64           ; 1  kid_x mod 14
+zp_d        = $65           ; 1  direction input: 1, $ff or 0
+zp_ledge    = $66           ; 1
+zp_visroom  = $67           ; 1  room currently on screen
+zp_dead_t   = $68           ; 1  respawn countdown after death
+zp_moved    = $69           ; 1  bit0: room changed, redraw needed
+
+; actions
+ACT_STAND     = 0
+ACT_MOVE      = 1
+ACT_HANG      = 2
+ACT_MIDAIR    = 3
+ACT_FREEFALL  = 4
+ACT_BUMPED    = 5
+ACT_HANGSTR   = 6
+ACT_TURN      = 7
+
+; input bits
+IN_UP    = 1
+IN_DOWN  = 2
+IN_LEFT  = 4
+IN_RIGHT = 8
+IN_SHIFT = 16
+
+; start a named sequence (offsets from seqtable.s; import kid_start_seq)
+.macro SEQSET name
+        lda #<name
+        ldx #>name
+        jsr kid_start_seq
+.endmacro
+
+; carry set if kid_seq >= val (16-bit)
+.macro SEQGE val
+        lda kid_seq
+        cmp #<val
+        lda kid_seq+1
+        sbc #>val
+.endmacro

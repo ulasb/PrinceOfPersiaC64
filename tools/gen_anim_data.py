@@ -39,6 +39,18 @@ def emit_seqtable():
         f"        .export SEQ_ORG_HI",
         f"SEQ_ORG_HI = ${seqdata.ORG >> 8:02x}",
         "",
+    ]
+    # sequence label offsets (and end-of-sequence offsets for range checks)
+    starts = sorted(seqdata.LABELS.values())
+    for name, off in sorted(seqdata.LABELS.items()):
+        i = starts.index(off)
+        end = starts[i + 1] if i + 1 < len(starts) else len(seqdata.SEQ_BYTES)
+        lines.append(f"SEQ_{name} = {off}")
+        lines.append(f"SEQEND_{name} = {end}")
+        lines.append(f"        .export SEQ_{name} : absolute, "
+                     f"SEQEND_{name} : absolute")
+    lines += [
+        "",
         '        .segment "ANIMDATA"',
         "SEQTABLE:",
     ]

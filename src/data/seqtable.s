@@ -5,6 +5,457 @@
         .export SEQ_ORG_HI
 SEQ_ORG_HI = $30
 
+SEQ_Mclimb = 2541
+SEQEND_Mclimb = 2546
+        .export SEQ_Mclimb : absolute, SEQEND_Mclimb : absolute
+SEQ_Mleave = 2522
+SEQEND_Mleave = 2541
+        .export SEQ_Mleave : absolute, SEQEND_Mleave : absolute
+SEQ_Mraise = 2518
+SEQEND_Mraise = 2522
+        .export SEQ_Mraise : absolute, SEQEND_Mraise : absolute
+SEQ_Mscurry = 2500
+SEQEND_Mscurry = 2502
+        .export SEQ_Mscurry : absolute, SEQEND_Mscurry : absolute
+SEQ_Mscurry1 = 2502
+SEQEND_Mscurry1 = 2514
+        .export SEQ_Mscurry1 : absolute, SEQEND_Mscurry1 : absolute
+SEQ_Mstop = 2514
+SEQEND_Mstop = 2518
+        .export SEQ_Mstop : absolute, SEQEND_Mstop : absolute
+SEQ_Palert = 2328
+SEQEND_Palert = 2343
+        .export SEQ_Palert : absolute, SEQEND_Palert : absolute
+SEQ_Pback = 2343
+SEQEND_Pback = 2363
+        .export SEQ_Pback : absolute, SEQEND_Pback : absolute
+SEQ_Pcrouch = 2427
+SEQEND_Pcrouch = 2495
+        .export SEQ_Pcrouch : absolute, SEQEND_Pcrouch : absolute
+SEQ_Pembrace = 2371
+SEQEND_Pembrace = 2405
+        .export SEQ_Pembrace : absolute, SEQEND_Pembrace : absolute
+SEQ_Plie = 2363
+SEQEND_Plie = 2367
+        .export SEQ_Plie : absolute, SEQEND_Plie : absolute
+SEQ_Prise = 2409
+SEQEND_Prise = 2427
+        .export SEQ_Prise : absolute, SEQEND_Prise : absolute
+SEQ_Pslump = 2495
+SEQEND_Pslump = 2500
+        .export SEQ_Pslump : absolute, SEQEND_Pslump : absolute
+SEQ_Pstand = 2324
+SEQEND_Pstand = 2328
+        .export SEQ_Pstand : absolute, SEQEND_Pstand : absolute
+SEQ_Pstroke = 2405
+SEQEND_Pstroke = 2409
+        .export SEQ_Pstroke : absolute, SEQEND_Pstroke : absolute
+SEQ_Pwaiting = 2367
+SEQEND_Pwaiting = 2371
+        .export SEQ_Pwaiting : absolute, SEQEND_Pwaiting : absolute
+SEQ_Vexit = 2284
+SEQEND_Vexit = 2324
+        .export SEQ_Vexit : absolute, SEQEND_Vexit : absolute
+SEQ_Vraise = 2233
+SEQEND_Vraise = 2254
+        .export SEQ_Vraise : absolute, SEQEND_Vraise : absolute
+SEQ_Vstand = 2229
+SEQEND_Vstand = 2233
+        .export SEQ_Vstand : absolute, SEQEND_Vstand : absolute
+SEQ_Vstop = 2277
+SEQEND_Vstop = 2284
+        .export SEQ_Vstop : absolute, SEQEND_Vstop : absolute
+SEQ_Vwalk = 2254
+SEQEND_Vwalk = 2256
+        .export SEQ_Vwalk : absolute, SEQEND_Vwalk : absolute
+SEQ_Vwalk1 = 2256
+SEQEND_Vwalk1 = 2259
+        .export SEQ_Vwalk1 : absolute, SEQEND_Vwalk1 : absolute
+SEQ_Vwalk2 = 2259
+SEQEND_Vwalk2 = 2277
+        .export SEQ_Vwalk2 : absolute, SEQEND_Vwalk2 : absolute
+SEQ_advance = 393
+SEQEND_advance = 408
+        .export SEQ_advance : absolute, SEQEND_advance : absolute
+SEQ_alertstand = 286
+SEQEND_alertstand = 290
+        .export SEQ_alertstand : absolute, SEQEND_alertstand : absolute
+SEQ_alertturn = 513
+SEQEND_alertturn = 521
+        .export SEQ_alertturn : absolute, SEQEND_alertturn : absolute
+SEQ_arise = 290
+SEQEND_arise = 311
+        .export SEQ_arise : absolute, SEQEND_arise : absolute
+SEQ_blockedstrike = 458
+SEQEND_blockedstrike = 464
+        .export SEQ_blockedstrike : absolute, SEQEND_blockedstrike : absolute
+SEQ_blocking = 469
+SEQEND_blocking = 473
+        .export SEQ_blocking : absolute, SEQEND_blocking : absolute
+SEQ_blocktostrike = 464
+SEQEND_blocktostrike = 468
+        .export SEQ_blocktostrike : absolute, SEQEND_blocktostrike : absolute
+SEQ_bump = 1397
+SEQEND_bump = 1407
+        .export SEQ_bump : absolute, SEQEND_bump : absolute
+SEQ_bumpengback = 491
+SEQEND_bumpengback = 498
+        .export SEQ_bumpengback : absolute, SEQEND_bumpengback : absolute
+SEQ_bumpengfwd = 484
+SEQEND_bumpengfwd = 491
+        .export SEQ_bumpengfwd : absolute, SEQEND_bumpengfwd : absolute
+SEQ_bumpfall = 1407
+SEQEND_bumpfall = 1438
+        .export SEQ_bumpfall : absolute, SEQEND_bumpfall : absolute
+SEQ_bumpfloat = 1438
+SEQEND_bumpfloat = 1460
+        .export SEQ_bumpfloat : absolute, SEQEND_bumpfloat : absolute
+SEQ_climbdown = 1123
+SEQEND_climbdown = 1145
+        .export SEQ_climbdown : absolute, SEQEND_climbdown : absolute
+SEQ_climbfail = 1107
+SEQEND_climbfail = 1123
+        .export SEQ_climbfail : absolute, SEQEND_climbfail : absolute
+SEQ_climbstairs = 2136
+SEQEND_climbstairs = 2229
+        .export SEQ_climbstairs : absolute, SEQEND_climbstairs : absolute
+SEQ_climbup = 1145
+SEQEND_climbup = 1178
+        .export SEQ_climbup : absolute, SEQEND_climbup : absolute
+SEQ_crawl = 656
+SEQEND_crawl = 656
+        .export SEQ_crawl : absolute, SEQEND_crawl : absolute
+SEQ_crush = 2124
+SEQEND_crush = 2127
+        .export SEQ_crush : absolute, SEQEND_crush : absolute
+SEQ_deadfall = 2127
+SEQEND_deadfall = 2136
+        .export SEQ_deadfall : absolute, SEQEND_deadfall : absolute
+SEQ_drinkpotion = 1922
+SEQEND_drinkpotion = 1954
+        .export SEQ_drinkpotion : absolute, SEQEND_drinkpotion : absolute
+SEQ_dropdead = 2089
+SEQEND_dropdead = 2105
+        .export SEQ_dropdead : absolute, SEQEND_dropdead : absolute
+SEQ_efightfall = 790
+SEQEND_efightfall = 820
+        .export SEQ_efightfall : absolute, SEQEND_efightfall : absolute
+SEQ_efightfallfwd = 820
+SEQEND_efightfallfwd = 848
+        .export SEQ_efightfallfwd : absolute, SEQEND_efightfallfwd : absolute
+SEQ_engarde = 314
+SEQEND_engarde = 328
+        .export SEQ_engarde : absolute, SEQEND_engarde : absolute
+SEQ_fall1 = 857
+SEQEND_fall1 = 879
+        .export SEQ_fall1 : absolute, SEQEND_fall1 : absolute
+SEQ_fallhang = 1389
+SEQEND_fallhang = 1397
+        .export SEQ_fallhang : absolute, SEQEND_fallhang : absolute
+SEQ_fastadvance = 408
+SEQEND_fastadvance = 420
+        .export SEQ_fastadvance : absolute, SEQEND_fastadvance : absolute
+SEQ_fastsheathe = 1908
+SEQEND_fastsheathe = 1922
+        .export SEQ_fastsheathe : absolute, SEQEND_fastsheathe : absolute
+SEQ_faststrike = 440
+SEQEND_faststrike = 442
+        .export SEQ_faststrike : absolute, SEQEND_faststrike : absolute
+SEQ_fightfall = 762
+SEQEND_fightfall = 790
+        .export SEQ_fightfall : absolute, SEQEND_fightfall : absolute
+SEQ_finishturn = 700
+SEQEND_finishturn = 712
+        .export SEQ_finishturn : absolute, SEQEND_finishturn : absolute
+SEQ_flee = 498
+SEQEND_flee = 505
+        .export SEQ_flee : absolute, SEQEND_flee : absolute
+SEQ_freefall = 1216
+SEQEND_freefall = 1222
+        .export SEQ_freefall : absolute, SEQEND_freefall : absolute
+SEQ_fullstep = 1526
+SEQEND_fullstep = 1526
+        .export SEQ_fullstep : absolute, SEQEND_fullstep : absolute
+SEQ_goalertstand = 284
+SEQEND_goalertstand = 286
+        .export SEQ_goalertstand : absolute, SEQEND_goalertstand : absolute
+SEQ_guardengarde = 311
+SEQEND_guardengarde = 314
+        .export SEQ_guardengarde : absolute, SEQEND_guardengarde : absolute
+SEQ_guy3 = 442
+SEQEND_guy3 = 443
+        .export SEQ_guy3 : absolute, SEQEND_guy3 : absolute
+SEQ_guy4 = 443
+SEQEND_guy4 = 446
+        .export SEQ_guy4 : absolute, SEQEND_guy4 : absolute
+SEQ_guy5 = 446
+SEQEND_guy5 = 447
+        .export SEQ_guy5 : absolute, SEQEND_guy5 : absolute
+SEQ_guy6 = 447
+SEQEND_guy6 = 448
+        .export SEQ_guy6 : absolute, SEQEND_guy6 : absolute
+SEQ_guy7 = 448
+SEQEND_guy7 = 451
+        .export SEQ_guy7 : absolute, SEQEND_guy7 : absolute
+SEQ_guy8 = 451
+SEQEND_guy8 = 454
+        .export SEQ_guy8 : absolute, SEQEND_guy8 : absolute
+SEQ_guy9 = 454
+SEQEND_guy9 = 458
+        .export SEQ_guy9 : absolute, SEQEND_guy9 : absolute
+SEQ_halve = 2116
+SEQEND_halve = 2124
+        .export SEQ_halve : absolute, SEQEND_halve : absolute
+SEQ_hang = 1046
+SEQEND_hang = 1049
+        .export SEQ_hang : absolute, SEQEND_hang : absolute
+SEQ_hang1 = 1049
+SEQEND_hang1 = 1094
+        .export SEQ_hang1 : absolute, SEQEND_hang1 : absolute
+SEQ_hangdrop = 1178
+SEQEND_hangdrop = 1197
+        .export SEQ_hangdrop : absolute, SEQEND_hangdrop : absolute
+SEQ_hangfall = 1197
+SEQEND_hangfall = 1216
+        .export SEQ_hangfall : absolute, SEQEND_hangfall : absolute
+SEQ_hangstraight = 1094
+SEQEND_hangstraight = 1107
+        .export SEQ_hangstraight : absolute, SEQEND_hangstraight : absolute
+SEQ_hardbump = 1460
+SEQEND_hardbump = 1490
+        .export SEQ_hardbump : absolute, SEQEND_hardbump : absolute
+SEQ_hardland = 2071
+SEQEND_hardland = 2084
+        .export SEQ_hardland : absolute, SEQEND_hardland : absolute
+SEQ_highjump = 1268
+SEQEND_highjump = 1298
+        .export SEQ_highjump : absolute, SEQEND_highjump : absolute
+SEQ_impale = 2105
+SEQEND_impale = 2116
+        .export SEQ_impale : absolute, SEQEND_impale : absolute
+SEQ_jumpbackhang = 1017
+SEQEND_jumpbackhang = 1046
+        .export SEQ_jumpbackhang : absolute, SEQEND_jumpbackhang : absolute
+SEQ_jumpfall = 913
+SEQEND_jumpfall = 941
+        .export SEQ_jumpfall : absolute, SEQEND_jumpfall : absolute
+SEQ_jumphangLong = 990
+SEQEND_jumphangLong = 1017
+        .export SEQ_jumphangLong : absolute, SEQEND_jumphangLong : absolute
+SEQ_jumphangMed = 969
+SEQEND_jumphangMed = 990
+        .export SEQ_jumphangMed : absolute, SEQEND_jumphangMed : absolute
+SEQ_jumpup = 1247
+SEQEND_jumpup = 1268
+        .export SEQ_jumpup : absolute, SEQEND_jumpup : absolute
+SEQ_landengarde = 478
+SEQEND_landengarde = 484
+        .export SEQ_landengarde : absolute, SEQEND_landengarde : absolute
+SEQ_landrun = 1973
+SEQEND_landrun = 2005
+        .export SEQ_landrun : absolute, SEQEND_landrun : absolute
+SEQ_medland = 2005
+SEQEND_medland = 2071
+        .export SEQ_medland : absolute, SEQEND_medland : absolute
+SEQ_patchfall = 879
+SEQEND_patchfall = 886
+        .export SEQ_patchfall : absolute, SEQEND_patchfall : absolute
+SEQ_pickupsword = 1859
+SEQEND_pickupsword = 1875
+        .export SEQ_pickupsword : absolute, SEQEND_pickupsword : absolute
+SEQ_rdiveroll = 634
+SEQEND_rdiveroll = 656
+        .export SEQ_rdiveroll : absolute, SEQEND_rdiveroll : absolute
+SEQ_ready = 328
+SEQEND_ready = 338
+        .export SEQ_ready : absolute, SEQEND_ready : absolute
+SEQ_readyblock = 468
+SEQEND_readyblock = 469
+        .export SEQ_readyblock : absolute, SEQEND_readyblock : absolute
+SEQ_resheathe = 1875
+SEQEND_resheathe = 1908
+        .export SEQ_resheathe : absolute, SEQEND_resheathe : absolute
+SEQ_retreat = 420
+SEQEND_retreat = 434
+        .export SEQ_retreat : absolute, SEQEND_retreat : absolute
+SEQ_rjlandrun = 625
+SEQEND_rjlandrun = 634
+        .export SEQ_rjlandrun : absolute, SEQEND_rjlandrun : absolute
+SEQ_rjumpfall = 941
+SEQEND_rjumpfall = 969
+        .export SEQ_rjumpfall : absolute, SEQEND_rjumpfall : absolute
+SEQ_runcyc1 = 247
+SEQEND_runcyc1 = 250
+        .export SEQ_runcyc1 : absolute, SEQEND_runcyc1 : absolute
+SEQ_runcyc2 = 250
+SEQEND_runcyc2 = 253
+        .export SEQ_runcyc2 : absolute, SEQEND_runcyc2 : absolute
+SEQ_runcyc3 = 253
+SEQEND_runcyc3 = 258
+        .export SEQ_runcyc3 : absolute, SEQEND_runcyc3 : absolute
+SEQ_runcyc4 = 258
+SEQEND_runcyc4 = 261
+        .export SEQ_runcyc4 : absolute, SEQEND_runcyc4 : absolute
+SEQ_runcyc5 = 261
+SEQEND_runcyc5 = 264
+        .export SEQ_runcyc5 : absolute, SEQEND_runcyc5 : absolute
+SEQ_runcyc6 = 264
+SEQEND_runcyc6 = 267
+        .export SEQ_runcyc6 : absolute, SEQEND_runcyc6 : absolute
+SEQ_runcyc7 = 267
+SEQEND_runcyc7 = 272
+        .export SEQ_runcyc7 : absolute, SEQEND_runcyc7 : absolute
+SEQ_runcyc8 = 272
+SEQEND_runcyc8 = 278
+        .export SEQ_runcyc8 : absolute, SEQEND_runcyc8 : absolute
+SEQ_runjump = 579
+SEQEND_runjump = 625
+        .export SEQ_runjump : absolute, SEQEND_runjump : absolute
+SEQ_running = 228
+SEQEND_running = 233
+        .export SEQ_running : absolute, SEQEND_running : absolute
+SEQ_runstop = 1222
+SEQEND_runstop = 1247
+        .export SEQ_runstop : absolute, SEQEND_runstop : absolute
+SEQ_runstt1 = 235
+SEQEND_runstt1 = 236
+        .export SEQ_runstt1 : absolute, SEQEND_runstt1 : absolute
+SEQ_runstt2 = 236
+SEQEND_runstt2 = 237
+        .export SEQ_runstt2 : absolute, SEQEND_runstt2 : absolute
+SEQ_runstt3 = 237
+SEQEND_runstt3 = 238
+        .export SEQ_runstt3 : absolute, SEQEND_runstt3 : absolute
+SEQ_runstt4 = 238
+SEQEND_runstt4 = 241
+        .export SEQ_runstt4 : absolute, SEQEND_runstt4 : absolute
+SEQ_runstt5 = 241
+SEQEND_runstt5 = 244
+        .export SEQ_runstt5 : absolute, SEQEND_runstt5 : absolute
+SEQ_runstt6 = 244
+SEQEND_runstt6 = 247
+        .export SEQ_runstt6 : absolute, SEQEND_runstt6 : absolute
+SEQ_runturn = 719
+SEQEND_runturn = 762
+        .export SEQ_runturn : absolute, SEQEND_runturn : absolute
+SEQ_sdiveroll = 656
+SEQEND_sdiveroll = 656
+        .export SEQ_sdiveroll : absolute, SEQEND_sdiveroll : absolute
+SEQ_sjland = 550
+SEQEND_sjland = 579
+        .export SEQ_sjland : absolute, SEQEND_sjland : absolute
+SEQ_softland = 1954
+SEQEND_softland = 1973
+        .export SEQ_softland : absolute, SEQEND_softland : absolute
+SEQ_stabbed = 338
+SEQEND_stabbed = 367
+        .export SEQ_stabbed : absolute, SEQEND_stabbed : absolute
+SEQ_stabkill = 2084
+SEQEND_stabkill = 2089
+        .export SEQ_stabkill : absolute, SEQEND_stabkill : absolute
+SEQ_stand = 278
+SEQEND_stand = 284
+        .export SEQ_stand : absolute, SEQEND_stand : absolute
+SEQ_standjump = 521
+SEQEND_standjump = 550
+        .export SEQ_standjump : absolute, SEQEND_standjump : absolute
+SEQ_standup = 1836
+SEQEND_standup = 1859
+        .export SEQ_standup : absolute, SEQEND_standup : absolute
+SEQ_startrun = 233
+SEQEND_startrun = 235
+        .export SEQ_startrun : absolute, SEQEND_startrun : absolute
+SEQ_step1 = 1815
+SEQEND_step1 = 1824
+        .export SEQ_step1 : absolute, SEQEND_step1 : absolute
+SEQ_step10 = 1648
+SEQEND_step10 = 1653
+        .export SEQ_step10 : absolute, SEQEND_step10 : absolute
+SEQ_step10a = 1653
+SEQEND_step10a = 1676
+        .export SEQ_step10a : absolute, SEQEND_step10a : absolute
+SEQ_step11 = 1619
+SEQEND_step11 = 1648
+        .export SEQ_step11 : absolute, SEQEND_step11 : absolute
+SEQ_step12 = 1588
+SEQEND_step12 = 1619
+        .export SEQ_step12 : absolute, SEQEND_step12 : absolute
+SEQ_step13 = 1557
+SEQEND_step13 = 1588
+        .export SEQ_step13 : absolute, SEQEND_step13 : absolute
+SEQ_step14 = 1526
+SEQEND_step14 = 1526
+        .export SEQ_step14 : absolute, SEQEND_step14 : absolute
+SEQ_step2 = 1803
+SEQEND_step2 = 1815
+        .export SEQ_step2 : absolute, SEQEND_step2 : absolute
+SEQ_step3 = 1787
+SEQEND_step3 = 1803
+        .export SEQ_step3 : absolute, SEQEND_step3 : absolute
+SEQ_step4 = 1771
+SEQEND_step4 = 1787
+        .export SEQ_step4 : absolute, SEQEND_step4 : absolute
+SEQ_step5 = 1750
+SEQEND_step5 = 1771
+        .export SEQ_step5 : absolute, SEQEND_step5 : absolute
+SEQ_step6 = 1729
+SEQEND_step6 = 1750
+        .export SEQ_step6 : absolute, SEQEND_step6 : absolute
+SEQ_step7 = 1708
+SEQEND_step7 = 1729
+        .export SEQ_step7 : absolute, SEQEND_step7 : absolute
+SEQ_step8 = 1682
+SEQEND_step8 = 1708
+        .export SEQ_step8 : absolute, SEQEND_step8 : absolute
+SEQ_step9 = 1676
+SEQEND_step9 = 1682
+        .export SEQ_step9 : absolute, SEQEND_step9 : absolute
+SEQ_stepback = 1521
+SEQEND_stepback = 1526
+        .export SEQ_stepback : absolute, SEQEND_stepback : absolute
+SEQ_stepfall = 848
+SEQEND_stepfall = 857
+        .export SEQ_stepfall : absolute, SEQEND_stepfall : absolute
+SEQ_stepfall2 = 886
+SEQEND_stepfall2 = 891
+        .export SEQ_stepfall2 : absolute, SEQEND_stepfall2 : absolute
+SEQ_stepfloat = 891
+SEQEND_stepfloat = 913
+        .export SEQ_stepfloat : absolute, SEQEND_stepfloat : absolute
+SEQ_stoop = 1824
+SEQEND_stoop = 1836
+        .export SEQ_stoop : absolute, SEQEND_stoop : absolute
+SEQ_strike = 434
+SEQEND_strike = 440
+        .export SEQ_strike : absolute, SEQEND_strike : absolute
+SEQ_strikeadv = 367
+SEQEND_strikeadv = 381
+        .export SEQ_strikeadv : absolute, SEQEND_strikeadv : absolute
+SEQ_strikeblock = 473
+SEQEND_strikeblock = 478
+        .export SEQ_strikeblock : absolute, SEQEND_strikeblock : absolute
+SEQ_strikeret = 381
+SEQEND_strikeret = 393
+        .export SEQ_strikeret : absolute, SEQEND_strikeret : absolute
+SEQ_superhijump = 1298
+SEQEND_superhijump = 1389
+        .export SEQ_superhijump : absolute, SEQEND_superhijump : absolute
+SEQ_testfoot = 1490
+SEQEND_testfoot = 1521
+        .export SEQ_testfoot : absolute, SEQEND_testfoot : absolute
+SEQ_turn = 686
+SEQEND_turn = 700
+        .export SEQ_turn : absolute, SEQEND_turn : absolute
+SEQ_turndraw = 674
+SEQEND_turndraw = 686
+        .export SEQ_turndraw : absolute, SEQEND_turndraw : absolute
+SEQ_turnengarde = 505
+SEQEND_turnengarde = 513
+        .export SEQ_turnengarde : absolute, SEQEND_turnengarde : absolute
+SEQ_turnrun = 712
+SEQEND_turnrun = 719
+        .export SEQ_turnrun : absolute, SEQEND_turnrun : absolute
+
         .segment "ANIMDATA"
 SEQTABLE:
         .byte $e9,$30,$16,$31,$09,$32,$43,$32,$ae,$32,$cf,$32,$50,$33,$c9,$33
