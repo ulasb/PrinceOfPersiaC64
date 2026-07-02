@@ -13,10 +13,14 @@ PRG     = $(BUILDIR)/pop.prg
 
 .PHONY: all run test clean assets
 
-# Regenerate data tables and level binaries from ../PrinceOfPersiaPy
+all: $(PRG)
+
+# Regenerate data tables, graphics and level binaries from ../PrinceOfPersiaPy
 assets:
 	python3 tools/gen_anim_data.py
+	python3 tools/gen_bgdata.py
 	python3 tools/copy_levels.py
+	python3 tools/convert_gfx.py
 
 all: $(PRG)
 

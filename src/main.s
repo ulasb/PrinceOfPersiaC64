@@ -1,18 +1,18 @@
-; Prince of Persia C64 — walking skeleton
-; Sets up a stable raster loop and proves the build pipeline works.
+; Prince of Persia C64 — startup and main loop.
 
-        .include "c64.inc"
+        .include "pop.inc"
 
-        .export _main := entry
+        .import blit_init, draw_room, draw_foreground, LEVEL
+        .import gfxh_start, gfxh_end
 
         .segment "LOADADDR"
-        .addr   $0801           ; PRG load address
+        .addr   $0801
 
 ; BASIC stub: 10 SYS 2062
         .segment "EXEHDR"
         .word   next_line
-        .word   10              ; line number
-        .byte   $9e             ; SYS token
+        .word   10
+        .byte   $9e
         .byte   "2062"
         .byte   0
 next_line:
@@ -21,46 +21,89 @@ next_line:
         .segment "STARTUP"
 entry:
         sei
-        lda #$35                ; RAM + I/O, no BASIC/KERNAL ROM
+        ldx #$ff
+        txs
+        lda #$35                ; RAM everywhere but I/O
         sta $01
 
-        lda #$00
-        sta VIC_BORDERCOLOR
-        sta VIC_BG_COLOR0
+        ; hardware vectors in RAM (KERNAL is banked out for good)
+        lda #<int_stub
+        sta $fffa
+        sta $fffe
+        lda #>int_stub
+        sta $fffb
+        sta $ffff
 
-        ; clear screen
-        ldx #$00
-        lda #$20                ; space
-clr:    sta $0400,x
-        sta $0500,x
-        sta $0600,x
-        sta $06e8,x
-        inx
-        bne clr
+        ; silence the CIAs
+        lda #$7f
+        sta $dc0d
+        sta $dd0d
+        lda $dc0d
+        lda $dd0d
 
-        ; write "POP C64" via screen codes at row 12, col 16
+        ; move graphics destined above the KERNAL area: $5c00 -> $e000
+        lda #<gfxh_start
+        sta zp_src
+        lda #>gfxh_start
+        sta zp_src+1
+        lda #<$e000
+        sta zp_dst
+        lda #>$e000
+        sta zp_dst+1
+        ldx #>(gfxh_end - gfxh_start)   ; whole pages
+        inx                             ; + partial page
+        ldy #0
+@copy:  lda (zp_src),y
+        sta (zp_dst),y
+        iny
+        bne @copy
+        inc zp_src+1
+        inc zp_dst+1
+        dex
+        bne @copy
+
+        ; VIC: bank 1 ($4000), bitmap $6000, matrix $5c00, multicolor
+        lda $dd02
+        ora #$03
+        sta $dd02
+        lda $dd00
+        and #$fc
+        ora #$02
+        sta $dd00
+        lda #$3b                ; bitmap mode on
+        sta $d011
+        lda #$d8                ; multicolor
+        sta $d016
+        lda #$78                ; matrix $5c00, bitmap $6000
+        sta $d018
+        lda #0
+        sta $d020
+        sta $d021
+
+        ; cell colors: %01 white, %10 orange (matrix), %11 light blue (color RAM)
         ldx #0
-msg_loop:
-        lda message,x
-        beq main_loop
-        sta $0400 + 12*40 + 16,x
-        lda #$01                ; white
-        sta $d800 + 12*40 + 16,x
+@cols:  lda #$18
+        sta VIC_MATRIX,x
+        sta VIC_MATRIX+$100,x
+        sta VIC_MATRIX+$200,x
+        sta VIC_MATRIX+$2e8,x
+        lda #14
+        sta $d800,x
+        sta $d900,x
+        sta $da00,x
+        sta $dae8,x
         inx
-        bne msg_loop
+        bne @cols
 
-main_loop:
-        ; simple frame-synced border flash to prove we're alive
-wait_raster:
-        lda VIC_HLINE
-        cmp #$ff
-        bne wait_raster
-        inc frame_count
-        jmp main_loop
+        jsr blit_init
 
-message:
-        .byte 16, 15, 16, 32, 3, 54, 52, 0   ; "POP C64" screen codes
+        ; draw the kid's starting room
+        lda LEVEL+LV_INFO+64
+        sta zp_room
+        jsr draw_room
+        jsr draw_foreground
 
-        .segment "BSS"
-frame_count:
-        .res 1
+hang:   jmp hang
+
+int_stub:
+        rti
