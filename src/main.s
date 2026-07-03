@@ -10,6 +10,8 @@
         .import kid_sword_draw, save_invalidate
         .import guard_swap_in, guard_swap_out
         .import g_used, g_state, NGUARD
+        .import lv_tile, kid_getcol
+        .import BG_FRONTI
         .import game_tick, kid_spawn, kid_getcol
         .import tiles_init, tiles_reset, tiles_redraw, draw_falling
 
@@ -244,6 +246,7 @@ mainloop:
         jsr sword_hide
         jmp @nokid
 :       jsr kid_draw
+        jsr kid_priority
         lda kid_swd
         bne :+
         jsr sword_hide
@@ -339,6 +342,50 @@ hud_cell:
 @f:     sta (zp_ptr),y
         dey
         bpl @f
+        rts
+
+; Sprites drop behind the bitmap while the kid stands where a foreground
+; piece lives (posts, pillars, gate bars from the left neighbour, tall
+; fronts poking down from the row above) — those zones have black behind
+; them, so the priority flip reads as passing behind the piece.
+kid_priority:
+        lda kid_room
+        sta zp_rm
+        jsr kid_getcol
+        sta zp_tc
+        sta zp_tmp+2
+        lda kid_row
+        sta zp_tr
+        jsr lv_tile
+        tax
+        lda BG_FRONTI,x
+        bne @zone
+        ; a gate one column to the left hangs its bars into this column
+        lda zp_tmp+2
+        sec
+        sbc #1
+        sta zp_tc
+        lda kid_row
+        sta zp_tr
+        jsr lv_tile
+        cmp #T_GATE
+        beq @zone
+        ; fronts from the row above (pillar tops, arches)
+        lda zp_tmp+2
+        sta zp_tc
+        lda kid_row
+        sec
+        sbc #1
+        sta zp_tr
+        jsr lv_tile
+        tax
+        lda BG_FRONTI,x
+        bne @zone
+        lda #0
+        sta $d01b
+        rts
+@zone:  lda #$ff
+        sta $d01b
         rts
 
 ; white border flourish on finishing the level
