@@ -116,6 +116,18 @@ char_init:
 ; literals; ctrl >= $80: repeat next byte (ctrl&$7f)+2 times).
 ; in: zp_img -> compressed; out: DECOMP holds the raw image, zp_img -> DECOMP
 rle_decode:
+        ; already decoded? (DECOMP still holds the last image)
+        lda zp_img
+        cmp rc_last
+        bne @miss
+        lda zp_img+1
+        cmp rc_last+1
+        bne @miss
+        jmp @hit
+@miss:  lda zp_img
+        sta rc_last
+        lda zp_img+1
+        sta rc_last+1
         ldy #0
         lda (zp_img),y
         sta DECOMP
@@ -141,57 +153,70 @@ rle_decode:
         sta zp_t0+2             ; rows left in this column
         lda zp_wb
         sta zp_t0+3             ; columns left
-        lda #0
-        sta zp_done
         ldy #0
-@loop:  lda zp_done
-        bne @fin
-        jsr @fetch
-        tax                     ; N flag from the byte, not the inc
-        bmi @run
-        clc
-        adc #1
-        sta zp_t0+4
-@lit:   jsr @fetch
-        jsr @emit
-        lda zp_done
-        bne @fin
-        dec zp_t0+4
-        bne @lit
-        beq @loop
-@run:   and #$7f
-        clc
-        adc #2
-        sta zp_t0+4
-        jsr @fetch
-        sta zp_t0+5
-@rn:    lda zp_t0+5
-        jsr @emit
-        lda zp_done
-        bne @fin
-        dec zp_t0+4
-        bne @rn
-        beq @loop
-@fin:   lda #<DECOMP
-        sta zp_img
-        lda #>DECOMP
-        sta zp_img+1
-        rts
-@fetch: lda (zp_src),y
+@loop:  lda (zp_src),y          ; control byte
         inc zp_src
         bne :+
         inc zp_src+1
-:       rts
-@emit:  sta (zp_dst),y
-        clc
+:       tax
+        bmi @run
+        ; literal: X+1 bytes follow
+        inx
+        stx zp_t0+4
+@lit:   lda (zp_src),y
+        inc zp_src
+        bne :+
+        inc zp_src+1
+:       sta (zp_dst),y
         lda zp_dst
+        clc
         adc zp_wb
         sta zp_dst
         bcc :+
         inc zp_dst+1
 :       dec zp_t0+2
-        bne @edone
-        lda zp_h                ; next column
+        beq @lcol
+@lnext: dec zp_t0+4
+        bne @lit
+        beq @loop
+@lcol:  jsr next_col
+        bcc @lnext
+        jmp @hit                ; all columns done
+@run:   txa
+        and #$7f
+        clc
+        adc #2
+        sta zp_t0+4
+        lda (zp_src),y          ; run value
+        inc zp_src
+        bne :+
+        inc zp_src+1
+:       sta zp_t0+5
+@rn:    lda zp_t0+5
+        sta (zp_dst),y
+        lda zp_dst
+        clc
+        adc zp_wb
+        sta zp_dst
+        bcc :+
+        inc zp_dst+1
+:       dec zp_t0+2
+        beq @rcol
+@rnext: dec zp_t0+4
+        bne @rn
+        beq @loop
+@rcol:  jsr next_col
+        bcc @rnext
+        jmp @hit
+@hit:   lda #<DECOMP
+        sta zp_img
+        lda #>DECOMP
+        sta zp_img+1
+        rts
+
+; advance to the next output column; carry set when the image is done
+next_col:
+        lda zp_h
         sta zp_t0+2
         inc zp_t0
         bne :+
@@ -201,10 +226,23 @@ rle_decode:
         lda zp_t0+1
         sta zp_dst+1
         dec zp_t0+3
-        bne @edone
-        lda #1
-        sta zp_done
-@edone: rts
+        beq @done
+        clc
+        rts
+@done:  sec
+        rts
+
+        .segment "BSS"
+rc_last:.res 2              ; image pointer currently in DECOMP
+        .segment "CODE"
+
+; invalidate the decode cache (level restart safety)
+        .export rle_cache_clear
+rle_cache_clear:
+        lda #0
+        sta rc_last
+        sta rc_last+1
+        rts
 
 ; ----------------------------------------------------- start a sequence
 ; in: A/X = lo/hi of the sequence offset

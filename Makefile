@@ -36,7 +36,7 @@ run: $(PRG)
 
 # Headless smoke test: run ~5s of emulation in warp mode, save a screenshot.
 test: $(PRG)
-	$(X64) -console -warp +sound -limitcycles 8000000 \
+	$(X64) -default -console -warp +sound -limitcycles 8000000 \
 	    -exitscreenshot $(BUILDIR)/test_shot.png \
 	    -autostartprgmode 1 $(PRG) > $(BUILDIR)/vice_test.log 2>&1 || true
 	@test -f $(BUILDIR)/test_shot.png && echo "OK: $(BUILDIR)/test_shot.png" || \

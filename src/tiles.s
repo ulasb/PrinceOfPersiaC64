@@ -49,6 +49,7 @@ zp_yb     = $99             ; 2  falling floor scratch
 zp_prow   = $9b             ; falling: row before move
 zp_gmode  = $9c             ; gate mode scratch
 zp_wide   = $9d             ; redraw spills into the row above
+zp_ndone  = $9e             ; tiles processed this tick
 
         .segment "BSS"
 gate_rm:  .res MAXGATE      ; 0 = free slot
@@ -287,22 +288,33 @@ mark_dirty:
 @full:
 @done:  rts
 
-; redraw all queued tiles: clear the four affected block rects, then
-; draw_block + fronts over the 3x3 neighbourhood (top-down order)
+; redraw queued tiles — at most 2 per tick so heavy animation (falling
+; debris) can never stall the frame rate; the rest stay queued.
+; Simple tiles clear/redraw only their own row (2x2 blocks, with tall
+; pieces below and torch flames to the left handled specially); gates
+; and exits spill upward and take the full 3x3.
 tiles_redraw:
         lda dq_n
         bne :+
         rts
 :       lda #0
         sta zp_slot
-@tile:  ldx zp_slot
+        sta zp_ndone
+@tile:  lda zp_ndone
+        cmp #2
+        bcc :+
+        jmp @requeue            ; budget spent: keep the rest for later
+:       ldx zp_slot
+        cpx dq_n
+        bcc :+
+        jmp @alldone
+:
         lda dq_c,x
         sta zp_tcc
         lda dq_r,x
         sta zp_trr
+        inc zp_ndone
         jsr set_room_ptr        ; zp_rm = zp_visroom for lv queries
-        ; gates and exits spill into the row above: full 4-rect clear and
-        ; 3x3 repaint; everything else only touches its own row
         lda zp_tcc
         sta zp_tc
         lda zp_trr
@@ -321,7 +333,7 @@ tiles_redraw:
         sta zp_wide
 @clears:
         beq @clr2
-        ; clear rects (c,r-1) (c+1,r-1)
+        ; wide: also clear the row above
         lda zp_tcc
         ldx zp_trr
         dex
@@ -340,17 +352,54 @@ tiles_redraw:
         adc #1
         ldx zp_trr
         jsr clear_block_rect
-        ; redraw around (c,r), rows top-down (start at r-1 only when wide)
+        ; torch flames from the left neighbour poke into our rect
+        lda zp_wide
+        bne @blocks
+        lda zp_tcc
+        sec
+        sbc #1
+        sta zp_tc
+        lda zp_trr
+        sta zp_tr
+        jsr lv_tile
+        cmp #T_TORCH
+        bne @blocks
+        lda zp_tcc
+        sec
+        sbc #1
+        sta zp_dcol
+        lda zp_trr
+        sta zp_drow
+        jsr draw_ok
+        bcc @blocks
+        jsr draw_block
+@blocks:
+        ; repaint rows (r-wide .. r+1) x cols (c-wide .. c+1)
         lda zp_trr
         sec
         sbc zp_wide
         sta zp_drow
 @rl:    lda zp_tcc
         sec
-        sbc #1
+        sbc zp_wide
         sta zp_dcol
-@cl:    jsr in_range
+@cl:    jsr draw_ok
         bcc @skipb
+        ; below-row blocks only matter when something tall pokes up
+        lda zp_wide
+        bne @dodraw
+        lda zp_drow
+        cmp zp_trr
+        beq @dodraw
+        lda zp_dcol
+        sta zp_tc
+        lda zp_drow
+        sta zp_tr
+        jsr lv_tile
+        tax
+        lda TALLFLAG,x
+        beq @skipb
+@dodraw:
         jsr draw_block
 @skipb: inc zp_dcol
         lda zp_dcol
@@ -371,9 +420,9 @@ tiles_redraw:
         sta zp_drow
 @frl:   lda zp_tcc
         sec
-        sbc #1
+        sbc zp_wide
         sta zp_dcol
-@fcl:   jsr in_range
+@fcl:   jsr draw_ok
         bcc @skipf
         jsr draw_front_block
 @skipf: inc zp_dcol
@@ -389,13 +438,38 @@ tiles_redraw:
         cmp #2
         bne @frl
         inc zp_slot
-        lda zp_slot
-        cmp dq_n
-        beq :+
         jmp @tile
-:       lda #0
+@alldone:
+        lda #0
         sta dq_n
         rts
+@requeue:
+        ; shift unprocessed entries to the front
+        ldx zp_slot             ; first unprocessed
+        ldy #0
+@sh:    cpx dq_n
+        bcs @shdone
+        lda dq_c,x
+        sta dq_c,y
+        lda dq_r,x
+        sta dq_r,y
+        inx
+        iny
+        bne @sh
+@shdone:
+        sty dq_n
+        rts
+
+; carry set if (zp_dcol, zp_drow) is a drawable block
+draw_ok:
+        jmp in_range
+
+        .segment "RODATA"
+; pieces tall enough to poke into the row above (block faces, gates,
+; exits, pillars, posts, torches with their flames, arches)
+TALLFLAG:
+        .byte 0,0,0,1,1,0,0,0,1,1, 0,0,0,0,0,0, 1,1,0,1, 1,0,0,0,0,1, 1,1,1,1
+        .segment "CODE"
 
 ; carry set if (zp_dcol, zp_drow) is a drawable block (-1..10, -1..2)
 in_range:
