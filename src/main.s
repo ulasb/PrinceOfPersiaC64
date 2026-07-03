@@ -2,10 +2,10 @@
 
         .include "pop.inc"
 
-        .import blit_init, draw_room, draw_foreground, draw_front_block
+        .import blit_init, draw_room, draw_foreground
         .import LEVEL
         .import gfxh_start, gfxh_end
-        .import char_init, kid_draw, kid_restore
+        .import char_init, kid_draw, kid_restore, spr_hide
         .import game_tick, kid_spawn, kid_getcol
         .import tiles_init, tiles_reset, tiles_redraw, draw_falling
 
@@ -99,6 +99,32 @@ entry:
         inx
         bne @cols
 
+        ; kid = sprites 0-5: multicolor, colors map the 2bpp codes directly
+        lda #%00111111
+        sta $d01c               ; multicolor on
+        lda #0
+        sta $d017               ; no expansion
+        sta $d01d
+        sta $d015               ; hidden until the first frame
+        sta $d01b               ; sprites in front of the bitmap
+        sta $d010
+        lda #1                  ; %01 = white
+        sta $d025
+        lda #14                 ; %11 = light blue
+        sta $d026
+        ldx #5
+        lda #8                  ; %10 = orange
+@sprc:  sta $d027,x
+        dex
+        bpl @sprc
+        ldx #5
+@sprp:  txa
+        clc
+        adc #SPRBLK
+        sta SPRPTR,x
+        dex
+        bpl @sprp
+
         ; CIA port A as input for joystick 2
         lda #0
         sta $dc02
@@ -111,7 +137,7 @@ entry:
         sta zp_previn
         sta zp_vskip
         sta zp_lvdone
-        lda #3
+        lda #4
         sta zp_tcnt
 .ifdef TESTSCRIPT
         lda #0
@@ -134,7 +160,7 @@ mainloop:
         dec zp_tcnt
         beq @tick
         jmp mainloop
-@tick:  lda #3                  ; game tick every 3rd frame (PAL)
+@tick:  lda #4                  ; game tick every 4th frame = 12.5/s (PAL)
         sta zp_tcnt
         jsr read_input
         lda zp_previn
@@ -160,32 +186,26 @@ mainloop:
         beq @noredraw
         lda #0
         sta zp_moved
-        jsr invalidate_save
         lda zp_visroom
         sta zp_room
         jsr draw_room
         jsr draw_foreground
         jmp @drawkid
 @noredraw:
-        jsr kid_restore
         jsr tiles_redraw
         jsr draw_falling
 @drawkid:
         lda kid_room
         cmp zp_visroom
-        bne @nokid
-        jsr kid_draw
-        jsr fronts_near_kid
+        beq :+
+        jsr spr_hide
+        jmp @nokid
+:       jsr kid_draw
 @nokid:
 .ifdef TESTSCRIPT
         jsr dbg_dump
 .endif
         jmp mainloop
-
-invalidate_save:
-        lda #0
-        sta $79                 ; sv_valid (char.s)
-        rts
 
 ; white border flourish on finishing the level
 victory_flash:
@@ -203,56 +223,6 @@ victory_flash:
         inx
         cpx #150
         bne @fl
-        rts
-
-; redraw foreground pieces on the 3x3 blocks around the kid so he appears
-; behind posts, gates and pillar fronts
-fronts_near_kid:
-        lda zp_visroom
-        sta zp_rm
-        jsr kid_getcol
-        sec
-        sbc #1
-        sta zp_fcol             ; start col
-        lda kid_row
-        sec
-        sbc #1
-        sta zp_frow             ; start row
-        ldx #0
-@rowl:  txa
-        clc
-        adc zp_frow
-        cmp #$ff                ; -1 is a valid row
-        beq @rowok
-        cmp #3
-        bcs @nextrow
-@rowok: sta zp_drow
-        ldy #0
-@coll:  tya
-        clc
-        adc zp_fcol
-        cmp #$ff                ; -1 is a valid col
-        beq @colok
-        cmp #11
-        bcs @nextcol
-@colok: sta zp_dcol
-        tya
-        pha
-        txa
-        pha
-        jsr draw_front_block
-        pla
-        tax
-        pla
-        tay
-@nextcol:
-        iny
-        cpy #3
-        bne @coll
-@nextrow:
-        inx
-        cpx #3
-        bne @rowl
         rts
 
 .ifdef TESTSCRIPT

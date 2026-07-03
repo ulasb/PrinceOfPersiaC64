@@ -808,9 +808,9 @@ set_room_ptr:
         rts
 
 ; clear the 14x63 pixel rect of block (A=col s8, X=row s8), clamped
-zp_cx0   = $9d              ; shared with tiles.s scratch (sequential use)
-zp_cbc   = $9e
-zp_cy    = $9f
+zp_cx0   = $a8
+zp_cbc   = $a9
+zp_cy    = $aa
 clear_block_rect:
         ; row range: block_top(row)..block_bot(row), clip 0..191
         cpx #$fe

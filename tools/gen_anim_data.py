@@ -82,7 +82,10 @@ def emit_framedef():
     ]
     fields = ("IMAGE", "SWORD", "DX", "DY", "CHK")
     lines += parallel_tables("FD_MAIN", framedefs.MAIN, fields)
-    # ALTSET1/ALTSET2/SWORDTAB return with the guard & combat build
+    lines += parallel_tables("FD_ALT1", framedefs.ALTSET1, fields)
+    swfields = ("F0", "F1", "F2")
+    lines += parallel_tables("SWORDTAB", framedefs.SWORDTAB, swfields)
+    # ALTSET2 (princess/vizier) returns with the endgame build
     lines.append("")
     return "\n".join(lines)
 

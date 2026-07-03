@@ -65,15 +65,35 @@ def bg2_reachable():
     return reachable_bg(True)
 
 
-def ch3_movement_images():
-    """CH3 images used by non-combat kid frames (landings, crouches);
-    the sword-fight frames (121-149) wait for the combat build."""
-    used = set()
-    for f, (img, sword, _dx, _dy, _chk) in framedefs.MAIN.items():
-        table = ((img & 0x80) >> 5) | ((sword & 0xC0) >> 6)
-        if table == 2 and not 121 <= f <= 149:
-            used.add(img & 0x7F)
-    return used
+def col_major(d: bytes, wb: int, h: int) -> bytes:
+    """Reorder image bytes column-major: character art runs vertically,
+    which RLE-compresses ~40% better than row order."""
+    return bytes(d[r * wb + c] for c in range(wb) for r in range(h))
+
+
+def rle(data: bytes) -> bytes:
+    """Byte RLE: ctrl < $80 = ctrl+1 literals follow; ctrl >= $80 =
+    repeat next byte (ctrl & $7f) + 2 times."""
+    out = bytearray()
+    i = 0
+    n = len(data)
+    while i < n:
+        run = 1
+        while i + run < n and data[i + run] == data[i] and run < 129:
+            run += 1
+        if run >= 2:
+            out.append(0x80 | (run - 2))
+            out.append(data[i])
+            i += run
+            continue
+        j = i + 1
+        while j < n and (j + 1 >= n or data[j + 1] != data[j]) \
+                and j - i < 128:
+            j += 1
+        out.append(j - i - 1)
+        out += data[i:j]
+        i = j
+    return bytes(out)
 
 WARM, COOL, WHITE = 2, 3, 1
 
@@ -213,16 +233,18 @@ def load_table(table_name: str, palette_hue: bool):
 # C64 RAM windows around VIC bank 2 (matrix $8c00, bitmap $a000-$bf3f).
 # GFXH loads into the bitmap hole in the PRG and is copied to $e000 at init;
 # $f000+ holds the blit tables and character buffers (see pop.inc).
-WINDOWS = [("GFX1", 0x4900, 0x8C00), ("GFX9", 0x9000, 0xA000),
+WINDOWS = [("GFX1", 0x5000, 0x8A80), ("GFX9", 0x9000, 0xA000),
            ("GFXC", 0xC000, 0xD000), ("GFXH", 0xE000, 0xF000)]
 
-# demo set: dungeon backgrounds + kid tables. CH3 is filtered to movement
-# frames; CHTAB5 (deaths, potions) doesn't fit yet — see PLAN.md.
-PACK_SET = [("BG1", "IMG.BGTAB1.DUN", False, bg1_reachable),
-            ("BG2", "IMG.BGTAB2.DUN", False, bg2_reachable),
-            ("CH1", "IMG.CHTAB1", True, None),
-            ("CH2", "IMG.CHTAB2", True, None),
-            ("CH3", "IMG.CHTAB3", True, ch3_movement_images)]
+# demo set: dungeon backgrounds + kid/guard tables. Character archives are
+# RLE-compressed (decompressed per frame at draw time); CHTAB5 (deaths,
+# potions, princess) still doesn't fit — see PLAN.md.
+PACK_SET = [("BG1", "IMG.BGTAB1.DUN", False, bg1_reachable, False),
+            ("BG2", "IMG.BGTAB2.DUN", False, bg2_reachable, False),
+            ("CH1", "IMG.CHTAB1", True, None, True),
+            ("CH2", "IMG.CHTAB2", True, None, True),
+            ("CH3", "IMG.CHTAB3", True, None, True),
+            ("CH4", "IMG.CHTAB4.GD", True, None, True)]
 
 
 def pack_windows():
@@ -230,11 +252,14 @@ def pack_windows():
     and src/data/gfxindex.s with absolute lo/hi address tables per archive."""
     blobs = {name: bytearray() for name, _, _ in WINDOWS}
     tables = {}
-    for label, table_name, hue, keep in PACK_SET:
+    for label, table_name, hue, keep, compress in PACK_SET:
         images = load_table(table_name, hue)
         if keep is not None:
             keep_set = keep()
             images = {n: im for n, im in images.items() if n in keep_set}
+        if compress:
+            images = {n: (wb, h, rle(col_major(d, wb, h)))
+                      for n, (wb, h, d) in images.items()}
         count = max(images) + 1
         addrs = [0] * count
         for n in sorted(images):

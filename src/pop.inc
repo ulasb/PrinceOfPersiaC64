@@ -59,8 +59,8 @@ ROWLO       = $0400
 ROWHI       = $0500
 VIC_MATRIX  = $8c00
 BITMAP      = $a000
-SAVEBUF     = $f900         ; $f900-$faff save-under (8 cols x 64 rows)
-COMPOSE     = $fb00         ; $fb00-$fcff character frame compose buffer
+SAVEBUF     = $f800         ; $f800-$f9ff save-under (8 cols x 64 rows)
+COMPOSE     = $fa00         ; $fa00-$fbff character frame compose buffer
 TAB_SHR2    = $f000         ; >>2
 TAB_SHR4    = $f100         ; >>4
 TAB_SHR6    = $f200         ; >>6
@@ -68,8 +68,8 @@ TAB_SHL6    = $f300         ; <<6 (pairs with SHR2)
 TAB_SHL4    = $f400         ; <<4
 TAB_SHL2    = $f500         ; <<2
 TAB_MASK    = $f600         ; AND-mask: 11 where 2px pair is 00
-ROWBUF      = $f700         ; shifted row scratch (17 bytes used)
-TAB_REV     = $f800         ; reverse the four 2px pairs in a byte
+ROWBUF      = $0700         ; shifted row scratch (17 bytes used)
+TAB_REV     = $f700         ; reverse the four 2px pairs in a byte
 
 ; ------------------------------------------------------------- zeropage
 zp_img      = $02           ; 2  piece/image data pointer
@@ -180,3 +180,15 @@ zp_fcol     = $6b           ; fronts_near_kid scan origin
 zp_frow     = $6c
 zp_vskip    = $6d           ; blit: crop N rows off the image top (one-shot)
 zp_lvdone   = $6e           ; nextlevel event latched
+
+; hardware sprites: the kid = 6 mc sprites (2 wide x 3 tall, bottom-anchored)
+SPRBUF      = $8a80         ; 6 sprite blocks in VIC bank 2
+SPRPTR      = VIC_MATRIX+$3f8
+SPRBLK      = (SPRBUF-$8000)/64
+SPRROWL     = $0600         ; 63-entry row-address tables for the pack loop
+SPRROWH     = $0680
+zp_t0       = $a0           ; 6  row byte staging
+zp_cw       = $a6           ; copy width (bytes, max 6)
+zp_gr       = $a7           ; grid row walker
+DECOMP      = $fc00         ; decompressed character frame (wb,h + 441 max)
+zp_done     = $ab           ; rle decoder end flag

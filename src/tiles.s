@@ -47,6 +47,7 @@ zp_pos    = $98             ; gate position scratch
 zp_yb     = $99             ; 2  falling floor scratch
 zp_prow   = $9b             ; falling: row before move
 zp_gmode  = $9c             ; gate mode scratch
+zp_wide   = $9d             ; redraw spills into the row above
 
         .segment "BSS"
 gate_rm:  .res MAXGATE      ; 0 = free slot
@@ -299,7 +300,27 @@ tiles_redraw:
         lda dq_r,x
         sta zp_trr
         jsr set_room_ptr        ; zp_rm = zp_visroom for lv queries
-        ; clear rects (c,r-1) (c+1,r-1) (c,r) (c+1,r)
+        ; gates and exits spill into the row above: full 4-rect clear and
+        ; 3x3 repaint; everything else only touches its own row
+        lda zp_tcc
+        sta zp_tc
+        lda zp_trr
+        sta zp_tr
+        jsr lv_tile
+        cmp #T_GATE
+        beq @wide
+        cmp #T_EXIT
+        beq @wide
+        cmp #T_EXIT2
+        beq @wide
+        lda #0
+        sta zp_wide
+        beq @clears
+@wide:  lda #1
+        sta zp_wide
+@clears:
+        beq @clr2
+        ; clear rects (c,r-1) (c+1,r-1)
         lda zp_tcc
         ldx zp_trr
         dex
@@ -310,7 +331,7 @@ tiles_redraw:
         ldx zp_trr
         dex
         jsr clear_block_rect
-        lda zp_tcc
+@clr2:  lda zp_tcc
         ldx zp_trr
         jsr clear_block_rect
         lda zp_tcc
@@ -318,10 +339,10 @@ tiles_redraw:
         adc #1
         ldx zp_trr
         jsr clear_block_rect
-        ; redraw 3x3 around (c,r), rows top-down
+        ; redraw around (c,r), rows top-down (start at r-1 only when wide)
         lda zp_trr
         sec
-        sbc #1
+        sbc zp_wide
         sta zp_drow
 @rl:    lda zp_tcc
         sec
@@ -342,10 +363,10 @@ tiles_redraw:
         sbc zp_trr
         cmp #2
         bne @rl
-        ; foreground pass over the same 3x3
+        ; foreground pass over the same blocks
         lda zp_trr
         sec
-        sbc #1
+        sbc zp_wide
         sta zp_drow
 @frl:   lda zp_tcc
         sec

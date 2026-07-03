@@ -5,7 +5,7 @@
         .include "pop.inc"
 
         .export kid_animate, kid_draw, kid_restore, kid_start_seq
-        .export char_init, kid_frame_chk
+        .export char_init, kid_frame_chk, spr_hide
         .import SEQTABLE
         .import FD_MAIN_IMAGE, FD_MAIN_SWORD, FD_MAIN_DX, FD_MAIN_DY
         .import FD_MAIN_CHK
@@ -70,7 +70,133 @@ char_init:
         bne @rev
         lda #0
         sta sv_valid
+        ; SPRROW tables: grid row gr (0..62) -> SPRBUF + (gr/21)*128 + (gr%21)*3
+        lda #<SPRBUF
+        sta zp_ptr
+        lda #>SPRBUF
+        sta zp_ptr+1
+        ldx #0                  ; gr
+        ldy #0                  ; row within sprite
+@srow:  lda zp_ptr
+        sta SPRROWL,x
+        lda zp_ptr+1
+        sta SPRROWH,x
+        clc
+        lda zp_ptr
+        adc #3
+        sta zp_ptr
+        bcc :+
+        inc zp_ptr+1
+:       iny
+        cpy #21
+        bne @snext
+        ; next sprite row: skip the right-column block (+128-63 = +65)
+        clc
+        lda zp_ptr
+        adc #65
+        sta zp_ptr
+        lda zp_ptr+1
+        adc #0
+        sta zp_ptr+1
+        ldy #0
+@snext: inx
+        cpx #63
+        bne @srow
         rts
+
+; ------------------------------------------------------- rle decoder
+; Character images are stored column-major RLE (ctrl < $80: ctrl+1
+; literals; ctrl >= $80: repeat next byte (ctrl&$7f)+2 times).
+; in: zp_img -> compressed; out: DECOMP holds the raw image, zp_img -> DECOMP
+rle_decode:
+        ldy #0
+        lda (zp_img),y
+        sta DECOMP
+        sta zp_wb
+        iny
+        lda (zp_img),y
+        sta DECOMP+1
+        sta zp_h
+        clc
+        lda zp_img
+        adc #2
+        sta zp_src
+        lda zp_img+1
+        adc #0
+        sta zp_src+1
+        lda #<(DECOMP+2)
+        sta zp_t0
+        sta zp_dst
+        lda #>(DECOMP+2)
+        sta zp_t0+1
+        sta zp_dst+1
+        lda zp_h
+        sta zp_t0+2             ; rows left in this column
+        lda zp_wb
+        sta zp_t0+3             ; columns left
+        lda #0
+        sta zp_done
+        ldy #0
+@loop:  lda zp_done
+        bne @fin
+        jsr @fetch
+        bmi @run
+        clc
+        adc #1
+        sta zp_t0+4
+@lit:   jsr @fetch
+        jsr @emit
+        lda zp_done
+        bne @fin
+        dec zp_t0+4
+        bne @lit
+        beq @loop
+@run:   and #$7f
+        clc
+        adc #2
+        sta zp_t0+4
+        jsr @fetch
+        sta zp_t0+5
+@rn:    lda zp_t0+5
+        jsr @emit
+        lda zp_done
+        bne @fin
+        dec zp_t0+4
+        bne @rn
+        beq @loop
+@fin:   lda #<DECOMP
+        sta zp_img
+        lda #>DECOMP
+        sta zp_img+1
+        rts
+@fetch: lda (zp_src),y
+        inc zp_src
+        bne :+
+        inc zp_src+1
+:       rts
+@emit:  sta (zp_dst),y
+        clc
+        lda zp_dst
+        adc zp_wb
+        sta zp_dst
+        bcc :+
+        inc zp_dst+1
+:       dec zp_t0+2
+        bne @edone
+        lda zp_h                ; next column
+        sta zp_t0+2
+        inc zp_t0
+        bne :+
+        inc zp_t0+1
+:       lda zp_t0
+        sta zp_dst
+        lda zp_t0+1
+        sta zp_dst+1
+        dec zp_t0+3
+        bne @edone
+        lda #1
+        sta zp_done
+@edone: rts
 
 ; ----------------------------------------------------- start a sequence
 ; in: A/X = lo/hi of the sequence offset
@@ -252,7 +378,7 @@ kid_frame_chk:
 kid_draw:
         lda kid_frame
         bne :+
-        rts
+        jmp spr_hide
 :       tax
         dex
         lda FD_MAIN_IMAGE,x
@@ -289,7 +415,7 @@ kid_draw:
         beq @ch2
         cmp #2
         beq @ch3
-        rts                     ; table not resident (special frames)
+        jmp spr_hide            ; table not resident (special frames)
 @ch1:   lda IMG_CH1_LO,x
         sta zp_img
         lda IMG_CH1_HI,x
@@ -307,8 +433,9 @@ kid_draw:
 @have:  lda zp_img
         ora zp_img+1
         bne :+
-        rts
-:
+        jmp spr_hide
+:       jsr rle_decode
+
         ; fx = 2*kid_x + dx*face   (hi-res, s16)
         lda kid_x
         asl
@@ -386,8 +513,163 @@ kid_draw:
         lda zp_bx+1
         adc #0
         sta zp_bx+1
-        jsr save_capture
-        jmp blit_ll
+        jmp kid_sprites
+
+; ------------------------------------------------- kid as hardware sprites
+; Pack the image at zp_img into the 6-sprite grid (24x63, bottom-anchored)
+; and position/enable the sprites at (zp_bx, zp_by).
+kid_sprites:
+        ldy #0
+        lda (zp_img),y
+        sta zp_wb
+        cmp #7
+        bcc :+
+        lda #6                  ; wider frames lose their trailing edge
+:       sta zp_cw
+        iny
+        lda (zp_img),y
+        sta zp_h
+        cmp #64
+        bcc :+
+        jmp spr_hide            ; defensive
+:       clc
+        lda zp_img
+        adc #2
+        sta zp_src
+        lda zp_img+1
+        adc #0
+        sta zp_src+1
+        ; clear the sprite blocks
+        lda #0
+        ldx #0
+@clr:   sta SPRBUF,x
+        sta SPRBUF+$80,x
+        sta SPRBUF+$100,x
+        inx
+        bpl @clr                ; 128 bytes each
+        ; first grid row = 63 - h
+        lda #63
+        sec
+        sbc zp_h
+        sta zp_gr
+@row:   ; stage up to 6 source bytes (rest stay zero)
+        lda #0
+        sta zp_t0
+        sta zp_t0+1
+        sta zp_t0+2
+        sta zp_t0+3
+        sta zp_t0+4
+        sta zp_t0+5
+        ldy #0
+        ldx #0
+@fetch: cpx zp_cw
+        bcs @stage
+        lda (zp_src),y
+        sta zp_t0,x
+        iny
+        inx
+        bne @fetch
+@stage: ldx zp_gr
+        lda SPRROWL,x
+        sta zp_dst
+        lda SPRROWH,x
+        sta zp_dst+1
+        ldy #0
+        lda zp_t0
+        sta (zp_dst),y
+        iny
+        lda zp_t0+1
+        sta (zp_dst),y
+        iny
+        lda zp_t0+2
+        sta (zp_dst),y
+        ldy #64
+        lda zp_t0+3
+        sta (zp_dst),y
+        iny
+        lda zp_t0+4
+        sta (zp_dst),y
+        iny
+        lda zp_t0+5
+        sta (zp_dst),y
+        ; next source row
+        clc
+        lda zp_src
+        adc zp_wb
+        sta zp_src
+        bcc :+
+        inc zp_src+1
+:       inc zp_gr
+        lda zp_gr
+        cmp #63
+        bne @row
+
+; position: sprite y = 50 + (by - 62) = by - 12; x = 24 + 2*bx
+        sec
+        lda zp_by
+        sbc #12
+        tax                     ; y of the top sprite row
+        lda zp_by+1
+        sbc #0
+        bmi spr_hide            ; too high up: transient, just hide
+        txa
+        sta $d001
+        sta $d003
+        clc
+        adc #21
+        sta $d005
+        sta $d007
+        adc #21
+        sta $d009
+        sta $d00b
+        ; x: 16-bit
+        lda zp_bx
+        asl
+        sta zp_t0
+        lda zp_bx+1
+        rol
+        sta zp_t0+1
+        clc
+        lda zp_t0
+        adc #24
+        sta zp_t0
+        lda zp_t0+1
+        adc #0
+        sta zp_t0+1             ; sx16
+        clc
+        lda zp_t0
+        adc #24
+        sta zp_t0+2
+        lda zp_t0+1
+        adc #0
+        sta zp_t0+3             ; sx16 + 24 (right column)
+        lda zp_t0
+        sta $d000
+        sta $d004
+        sta $d008
+        lda zp_t0+2
+        sta $d002
+        sta $d006
+        sta $d00a
+        ; x msb bits: sprites 0,2,4 = left col; 1,3,5 = right col
+        ldx #0
+        lda zp_t0+1
+        beq :+
+        ldx #%00010101
+:       lda zp_t0+3
+        beq :+
+        txa
+        ora #%00101010
+        tax
+:       stx $d010
+        lda #%00111111
+        sta $d015
+        rts
+
+spr_hide:
+        lda #0
+        sta $d015
+        rts
 
 add_fx_signed:
         tax
