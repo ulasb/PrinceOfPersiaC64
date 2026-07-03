@@ -5,15 +5,22 @@
         .include "pop.inc"
 
         .export kid_animate, kid_draw, kid_restore, kid_start_seq
-        .export char_init, kid_frame_chk, spr_hide
+        .export save_invalidate
+        .export char_init, kid_frame_chk, spr_hide, sword_hide
+        .export frame_def, rle_decode
         .import SEQTABLE
         .import FD_MAIN_IMAGE, FD_MAIN_SWORD, FD_MAIN_DX, FD_MAIN_DY
         .import FD_MAIN_CHK
+        .import FD_ALT1_IMAGE, FD_ALT1_SWORD, FD_ALT1_DX, FD_ALT1_DY
+        .import FD_ALT1_CHK
+        .import SWORDTAB_F0, SWORDTAB_F1, SWORDTAB_F2
         .import IMG_CH1_LO, IMG_CH1_HI, IMG_CH2_LO, IMG_CH2_HI
-        .import IMG_CH3_LO, IMG_CH3_HI
+        .import IMG_CH3_LO, IMG_CH3_HI, IMG_CH4_LO, IMG_CH4_HI
+        .import IMG_CH5_LO, IMG_CH5_HI
         .import blit_ll
 
 ; local zeropage
+zp_swfx   = $6f             ; 2? no: fx snapshot lo (hi in zp_swfx2)
 zp_guard  = $70
 zp_fimg   = $71
 zp_fsw    = $72
@@ -140,6 +147,7 @@ rle_decode:
 @loop:  lda zp_done
         bne @fin
         jsr @fetch
+        tax                     ; N flag from the byte, not the inc
         bmi @run
         clc
         adc #1
@@ -216,7 +224,11 @@ seq_fetch:
         adc kid_seq+1
         sta zp_ptr+1
         ldy #0
+        ldx #$34                ; the table lives under the I/O area
+        stx $01
         lda (zp_ptr),y
+        ldx #$35
+        stx $01
         inc kid_seq
         bne :+
         inc kid_seq+1
@@ -325,7 +337,10 @@ op_jard:
         sta kid_events
         jmp anim_loop
 op_effect:
-        jsr seq_fetch           ; effect argument unused for now
+        jsr seq_fetch           ; argument unused; flag the event
+        lda kid_events
+        ora #16
+        sta kid_events
         jmp anim_loop
 op_tap:
         jsr seq_fetch           ; tap sound id unused for now
@@ -360,27 +375,44 @@ subx_signed:
         adc #1                  ; A = -delta
         jmp addx_signed
 
-; ------------------------------------------------------ frame check byte
-; out: A = Fcheck byte of the current frame (0 for blank)
-kid_frame_chk:
+; -------------------------------------------------- frame definition
+; Look up the current frame for the active character (zp_chid): guards
+; remap falling frames 102-106 (+70) and take 150-189 from ALTSET1.
+; out: zp_fimg/zp_fsw/zp_fdx/zp_fdy loaded, A = Fcheck byte
+frame_def:
         ldx kid_frame
-        beq @blank
-        dex
-        lda FD_MAIN_CHK,x
-        rts
-@blank: lda #0
-        rts
-
-; ------------------------------------------------------------- kid_draw
-; Decode the current frame, compose (mirror if facing right), capture the
-; save-under rect and blit. Uses the original positioning rules:
-;   fx = 2*x + dx*face (hi-res); mirrored blit x = fx - (w - 7)
-kid_draw:
-        lda kid_frame
         bne :+
-        jmp spr_hide
-:       tax
-        dex
+        lda #0
+        rts
+:       lda zp_chid
+        beq @main
+        cpx #102
+        bcc @gnorm
+        cpx #107
+        bcs @gnorm
+        txa
+        clc
+        adc #70
+        tax
+@gnorm: cpx #150
+        bcc @main
+        cpx #190
+        bcs @main
+        txa
+        sec
+        sbc #150                ; FD_ALT1 covers frames 150-189
+        tax
+        lda FD_ALT1_IMAGE,x
+        sta zp_fimg
+        lda FD_ALT1_SWORD,x
+        sta zp_fsw
+        lda FD_ALT1_DX,x
+        sta zp_fdx
+        lda FD_ALT1_DY,x
+        sta zp_fdy
+        lda FD_ALT1_CHK,x
+        rts
+@main:  dex
         lda FD_MAIN_IMAGE,x
         sta zp_fimg
         lda FD_MAIN_SWORD,x
@@ -389,6 +421,22 @@ kid_draw:
         sta zp_fdx
         lda FD_MAIN_DY,x
         sta zp_fdy
+        lda FD_MAIN_CHK,x
+        rts
+
+; out: A = Fcheck byte of the current frame (0 for blank)
+kid_frame_chk:
+        jmp frame_def
+
+; ------------------------------------------------------------- kid_draw
+; Decode the current frame, compose (mirror if facing right), capture the
+; save-under rect and blit. Uses the original positioning rules:
+;   fx = 2*x + dx*face (hi-res); mirrored blit x = fx - (w - 7)
+kid_draw:
+        lda kid_frame
+        bne :+
+        jmp char_hide
+:       jsr frame_def
         ; table = ((img & $80) >> 5) | ((sword & $c0) >> 6)
         lda zp_fimg
         and #$80
@@ -415,7 +463,11 @@ kid_draw:
         beq @ch2
         cmp #2
         beq @ch3
-        jmp spr_hide            ; table not resident (special frames)
+        cmp #3
+        beq @ch4
+        cmp #4
+        beq @ch5
+        jmp char_hide           ; table not resident
 @ch1:   lda IMG_CH1_LO,x
         sta zp_img
         lda IMG_CH1_HI,x
@@ -430,10 +482,20 @@ kid_draw:
         sta zp_img
         lda IMG_CH3_HI,x
         sta zp_img+1
+        jmp @have
+@ch4:   lda IMG_CH4_LO,x
+        sta zp_img
+        lda IMG_CH4_HI,x
+        sta zp_img+1
+        jmp @have
+@ch5:   lda IMG_CH5_LO,x
+        sta zp_img
+        lda IMG_CH5_HI,x
+        sta zp_img+1
 @have:  lda zp_img
         ora zp_img+1
         bne :+
-        jmp spr_hide
+        jmp char_hide
 :       jsr rle_decode
 
         ; fx = 2*kid_x + dx*face   (hi-res, s16)
@@ -453,6 +515,10 @@ kid_draw:
         adc #1
         jsr add_fx_signed
 @dxdone:
+        lda zp_fx
+        sta zp_swfx             ; sword overlay anchors at the raw fx
+        lda zp_fx+1
+        sta zp_gr+1             ; (borrow: zp_gr+1 unused between frames)
         ; bottom = kid_y + sext(fdy)
         lda kid_y
         sta zp_by
@@ -513,7 +579,18 @@ kid_draw:
         lda zp_bx+1
         adc #0
         sta zp_bx+1
-        jmp kid_sprites
+        lda zp_chid
+        beq :+
+        jsr save_capture        ; guards: software blit with save-under
+        jmp blit_ll
+:       jmp kid_sprites
+
+; hide whichever character failed to resolve a frame
+char_hide:
+        lda zp_chid
+        bne :+
+        jmp spr_hide
+:       rts
 
 ; ------------------------------------------------- kid as hardware sprites
 ; Pack the image at zp_img into the 6-sprite grid (24x63, bottom-anchored)
@@ -662,13 +739,265 @@ kid_sprites:
         ora #%00101010
         tax
 :       stx $d010
-        lda #%00111111
+        lda $d015
+        ora #%00111111
         sta $d015
         rts
 
 spr_hide:
-        lda #0
+        lda $d015
+        and #%11000000
         sta $d015
+        rts
+
+sword_hide:
+        lda $d015
+        and #%00111111
+        sta $d015
+        rts
+
+; ---------------------------------------------------- kid sword overlay
+; Draw the sword as sprites 6-7 (2 wide x 1 tall, bottom-anchored 21).
+; Call right after kid_draw: zp_fsw/zp_swfx/face/kid_y are still valid.
+        .export kid_sword_draw
+kid_sword_draw:
+        lda zp_fsw
+        and #$3f
+        bne :+
+        jmp sword_hide
+:       tax
+        lda SWORDTAB_F0,x
+        bne :+
+        jmp sword_hide
+:       sta zp_tmp
+        lda SWORDTAB_F1,x
+        sta zp_fdx              ; sword dx (hi-res, signed)
+        lda SWORDTAB_F2,x
+        sta zp_fdy              ; sword dy (signed)
+        ldx zp_tmp
+        lda IMG_CH3_LO,x
+        sta zp_img
+        lda IMG_CH3_HI,x
+        sta zp_img+1
+        ora zp_img
+        bne :+
+        jmp sword_hide
+:       jsr rle_decode
+        ; sx = swfx + sdx*face
+        lda zp_swfx
+        sta zp_fx
+        lda zp_gr+1
+        sta zp_fx+1
+        lda zp_fdx
+        ldx kid_face
+        bmi @neg
+        jsr add_fx_signed
+        jmp @sx
+@neg:   eor #$ff
+        clc
+        adc #1
+        jsr add_fx_signed
+@sx:    ; bottom = kid_y + sext(sdy)
+        lda kid_y
+        sta zp_by
+        lda kid_y+1
+        sta zp_by+1
+        lda zp_fdy
+        jsr add_by_signed
+        ; mirror when facing right, then x math as for the kid
+        lda kid_face
+        bmi @nof
+        jsr compose_flip
+        clc
+        lda zp_fx
+        adc #6
+        sta zp_fx
+        lda zp_fx+1
+        adc #0
+        sta zp_fx+1
+        jsr fx_half
+        lda zp_wb
+        asl
+        asl
+        sta zp_tmp
+        sec
+        lda zp_bx
+        sbc zp_tmp
+        sta zp_bx
+        lda zp_bx+1
+        sbc #0
+        sta zp_bx+1
+        inc zp_bx
+        bne :+
+        inc zp_bx+1
+:       jmp @pl
+@nof:   jsr fx_half
+@pl:    clc
+        lda zp_bx
+        adc #PLAYFIELD_X
+        sta zp_bx
+        lda zp_bx+1
+        adc #0
+        sta zp_bx+1
+        ; pack into the 2 sword sprite blocks (24x21 grid)
+        ldy #0
+        lda (zp_img),y
+        sta zp_wb
+        cmp #7
+        bcc :+
+        lda #6
+:       sta zp_cw
+        iny
+        lda (zp_img),y
+        sta zp_h
+        clc
+        lda zp_img
+        adc #2
+        sta zp_src
+        lda zp_img+1
+        adc #0
+        sta zp_src+1
+        ; clip images taller than 21: skip their top rows
+        lda zp_h
+        cmp #22
+        bcc @hok
+        sec
+        sbc #21
+        tax                     ; rows to skip
+@skip:  clc
+        lda zp_src
+        adc zp_wb
+        sta zp_src
+        bcc :+
+        inc zp_src+1
+:       dex
+        bne @skip
+        lda #21
+        sta zp_h
+@hok:   ; clear both blocks
+        lda #0
+        ldx #63
+@sclr:  sta SWSPR,x
+        sta SWSPR+64,x
+        dex
+        bpl @sclr
+        ; rows, bottom-anchored in the 21-row grid
+        lda #21
+        sec
+        sbc zp_h
+        sta zp_gr
+@srow:  lda #0
+        sta zp_t0
+        sta zp_t0+1
+        sta zp_t0+2
+        sta zp_t0+3
+        sta zp_t0+4
+        sta zp_t0+5
+        ldy #0
+        ldx #0
+@sf:    cpx zp_cw
+        bcs @sst
+        lda (zp_src),y
+        sta zp_t0,x
+        iny
+        inx
+        bne @sf
+@sst:   ; dst = SWSPR + gr*3 (left) / +64 (right)
+        lda zp_gr
+        asl
+        clc
+        adc zp_gr               ; *3
+        tax
+        lda zp_t0
+        sta SWSPR,x
+        lda zp_t0+1
+        sta SWSPR+1,x
+        lda zp_t0+2
+        sta SWSPR+2,x
+        lda zp_t0+3
+        sta SWSPR+64,x
+        lda zp_t0+4
+        sta SWSPR+65,x
+        lda zp_t0+5
+        sta SWSPR+66,x
+        clc
+        lda zp_src
+        adc zp_wb
+        sta zp_src
+        bcc :+
+        inc zp_src+1
+:       inc zp_gr
+        lda zp_gr
+        cmp #21
+        bne @srow
+        ; position sprites 6-7: y = 50 + (by - 20)
+        sec
+        lda zp_by
+        sbc #<-30
+        clc
+        lda zp_by
+        clc
+        adc #30
+        sta $d00d
+        sta $d00f
+        ; x = 24 + 2*bx
+        lda zp_bx
+        asl
+        sta zp_t0
+        lda zp_bx+1
+        rol
+        sta zp_t0+1
+        clc
+        lda zp_t0
+        adc #24
+        sta zp_t0
+        lda zp_t0+1
+        adc #0
+        sta zp_t0+1
+        lda zp_t0
+        sta $d00c
+        clc
+        adc #24
+        sta $d00e
+        php
+        ; msb bits 6-7
+        lda $d010
+        and #%00111111
+        sta zp_tmp
+        lda zp_t0+1
+        beq :+
+        lda zp_tmp
+        ora #%01000000
+        sta zp_tmp
+:       plp
+        lda zp_t0+1
+        adc #0                  ; carry from the +24
+        beq :+
+        lda zp_tmp
+        ora #%10000000
+        sta zp_tmp
+:       lda zp_tmp
+        sta $d010
+        lda $d015
+        ora #%11000000
+        sta $d015
+        rts
+
+; zp_by += sext(A) (shared)
+add_by_signed:
+        tax
+        clc
+        adc zp_by
+        sta zp_by
+        txa
+        bmi @n
+        lda zp_by+1
+        adc #0
+        sta zp_by+1
+        rts
+@n:     lda zp_by+1
+        adc #$ff
+        sta zp_by+1
         rts
 
 add_fx_signed:
@@ -912,6 +1241,11 @@ colx8lo:.byte 0
 colx8hi:.byte 0
 
 ; restore the previously saved rect
+save_invalidate:
+        lda #0
+        sta sv_valid
+        rts
+
 kid_restore:
         lda sv_valid
         bne :+

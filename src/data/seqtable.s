@@ -456,7 +456,7 @@ SEQ_turnrun = 712
 SEQEND_turnrun = 719
         .export SEQ_turnrun : absolute, SEQEND_turnrun : absolute
 
-        .segment "ANIMDATA"
+        .segment "SEQDATA"
 SEQTABLE:
         .byte $e9,$30,$16,$31,$09,$32,$43,$32,$ae,$32,$cf,$32,$50,$33,$c9,$33
         .byte $16,$34,$79,$34,$9a,$34,$c0,$34,$c6,$34,$df,$34,$6d,$35,$f9,$33

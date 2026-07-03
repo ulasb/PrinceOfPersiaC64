@@ -10,7 +10,7 @@
 
         .export draw_room, draw_foreground, draw_front_block, draw_block
         .export piece_at, clear_block_rect, set_room_ptr
-        .import blit_ll, lv_tile, lv_spec
+        .import blit_ll, lv_tile, lv_spec, rle_decode
         .import loose_state
         .import BG_GATELIFT
         .import IMG_BG1_LO, IMG_BG1_HI, IMG_BG2_LO, IMG_BG2_HI
@@ -87,6 +87,7 @@ piece_at:
 @chk:   lda zp_img
         ora zp_img+1
         beq @none
+        jsr rle_decode          ; all archives are column-RLE now
         jmp blit_ll
 @none:  rts
 

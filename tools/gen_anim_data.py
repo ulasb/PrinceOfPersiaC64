@@ -51,7 +51,7 @@ def emit_seqtable():
                      f"SEQEND_{name} : absolute")
     lines += [
         "",
-        '        .segment "ANIMDATA"',
+        '        .segment "SEQDATA"',
         "SEQTABLE:",
     ]
     lines += byte_rows(seqdata.SEQ_BYTES)

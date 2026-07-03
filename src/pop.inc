@@ -190,5 +190,32 @@ SPRROWH     = $0680
 zp_t0       = $a0           ; 6  row byte staging
 zp_cw       = $a6           ; copy width (bytes, max 6)
 zp_gr       = $a7           ; grid row walker
-DECOMP      = $fc00         ; decompressed character frame (wb,h + 441 max)
+DECOMP      = $fc00         ; decompressed image, $fc00-$ff83 (wb*h <= 896)
 zp_done     = $ab           ; rle decoder end flag
+
+; combat / second character
+zp_chid     = $ac           ; 0 = kid, 2 = guard (frame substitutions)
+kid_swd     = $ad           ; kid's sword is drawn
+kid_hassw   = $ae           ; kid owns the sword
+zp_pickup   = $af           ; pending pickup: 0 none, 1 sword
+zp_pkrm     = $b0           ; pickup tile (resolved)
+zp_pkc      = $b1
+zp_pkr      = $b2
+; opponent cache for AI/combat (valid while opp_ok=1)
+opp_ok      = $b3
+opp_x       = $b4           ; 2
+opp_room    = $b6
+opp_row     = $b7
+opp_frame   = $b8
+opp_alive   = $b9
+opp_swd     = $ba
+opp_idx     = $bb           ; guard slot of the kid's opponent ($ff none)
+zp_dist     = $bc           ; |kid.x - opp.x| clamped to 255
+CHRSIZE     = $13           ; kid struct $50-$62 swap size
+SWSPR       = $bf40         ; 2 sprite blocks for the kid's sword overlay
+SWSPRBLK    = (SWSPR-$8000)/64
+kid_hurtcd  = $c0           ; damage cooldowns
+zp_hitk     = $c1           ; pending damage to the kid this tick
+zp_hitg     = $c2           ; pending damage to the guard
+opp_hp      = $c3           ; opponent hp cache
+zp_hudval   = $c4           ; HUD cell fill byte

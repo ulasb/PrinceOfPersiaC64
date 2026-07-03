@@ -11,7 +11,12 @@
         .import lv_tile, lv_spec, lv_link, LEVEL
         .import kid_animate, kid_start_seq, kid_frame_chk
         .import kid_control
-        .import tiles_tick, tiles_reset, shake_loose, press_plate
+        .import tiles_tick, tiles_reset, shake_loose, press_plate, set_tile
+        .import lv_resolve
+        .import guards_spawn, guard_swap_in, guard_swap_out, guard_control
+        .import pick_opponent, guard_cache_opp
+        .import g_used, g_state, g_skill, g_engaged, g_jblk, g_hurtcd, NGUARD
+        .import SEQ_dropdead, SEQ_stabbed, SEQ_blockedstrike
         .import SEQ_stand, SEQ_stepfall, SEQ_hardbump, SEQ_bump
         .import SEQ_softland, SEQ_medland, SEQ_hardland
         .import SEQ_runjump, SEQEND_runjump, SEQ_standjump, SEQEND_standjump
@@ -220,6 +225,22 @@ kid_spawn:
         sta zp_dead_t
         SEQSET SEQ_stand
         jsr kid_animate
+        lda #0
+        sta kid_swd
+        sta zp_pickup
+        sta kid_hurtcd
+.ifdef TESTSCRIPT
+        lda #1                  ; scripted runs start armed
+        sta kid_hassw
+        lda #0
+.endif
+        sta g_hurtcd
+        sta g_hurtcd+1
+        jsr guards_spawn
+.ifndef TESTSCRIPT
+        lda #0
+        sta kid_hassw
+.endif
         lda #1
         sta zp_moved
         rts
@@ -236,53 +257,18 @@ game_tick:
         jmp kid_spawn
 @alive: lda #0
         sta zp_dead_t
-@cont:  jsr kid_control
-        lda kid_y
-        sta kid_prevy
-        lda kid_y+1
-        sta kid_prevy+1
-        jsr kid_animate
-        ; gravity (freefall only)
-        lda kid_action
-        cmp #ACT_FREEFALL
-        bne @nofall
-        lda kid_yvel
-        clc
-        adc #GRAVITY
-        bmi :+
-        cmp #TERMVEL+1
-        bcc :+
-        lda #TERMVEL
-:       sta kid_yvel
-        ; x += xvel * face
-        lda kid_xvel
-        ldx kid_face
-        bmi @xf_neg
-        jsr add_x16
-        jmp @yadd
-@xf_neg:
-        eor #$ff
-        clc
-        adc #1
-        jsr add_x16
-@yadd:  ; y += yvel (signed)
-        lda kid_yvel
-        tax
-        clc
-        adc kid_y
-        sta kid_y
-        txa
-        bmi @yn
-        lda kid_y+1
-        adc #0
-        sta kid_y+1
-        jmp @nofall
-@yn:    lda kid_y+1
-        adc #$ff
-        sta kid_y+1
-@nofall:
-        jsr post_move
-        jsr normalize
+@cont:  lda kid_hurtcd
+        beq :+
+        dec kid_hurtcd
+:       lda g_hurtcd
+        beq :+
+        dec g_hurtcd
+:       lda g_hurtcd+1
+        beq :+
+        dec g_hurtcd+1
+:       jsr pick_opponent
+        jsr kid_control
+        jsr char_step
         ; fell past the last row with no room below
         lda kid_row
         bmi @rows_ok
@@ -313,7 +299,29 @@ game_tick:
         beq :+
         lda kid_row
         jsr jar_floors
+:       lda kid_events
+        and #16                 ; effect: apply a pending pickup
+        beq :+
+        lda zp_pickup
+        beq :+
+        lda #1
+        sta kid_hassw
+        lda zp_pkrm
+        sta zp_rrm
+        lda zp_pkc
+        sta zp_rc
+        lda zp_pkr
+        sta zp_rr
+        lda #T_FLOOR
+        ldx #0
+        jsr set_tile
+        lda #0
+        sta zp_pickup
 :       jsr check_plates
+        jsr guards_tick
+        jsr pick_opponent       ; guard phase leaves the cache pointing
+        jsr resolve_strikes     ; at the kid; re-select before combat
+        jsr separation
         jsr tiles_tick
         lda #0
         sta kid_events
@@ -379,6 +387,52 @@ check_plates:
         jmp shake_loose
 @plate: jmp press_plate
 @done:  rts
+
+; shared per-character physics: animate, gravity, fall, collide, wrap
+char_step:
+        lda kid_y
+        sta kid_prevy
+        lda kid_y+1
+        sta kid_prevy+1
+        jsr kid_animate
+        lda kid_action
+        cmp #ACT_FREEFALL
+        bne @nofall
+        lda kid_yvel
+        clc
+        adc #GRAVITY
+        bmi :+
+        cmp #TERMVEL+1
+        bcc :+
+        lda #TERMVEL
+:       sta kid_yvel
+        lda kid_xvel
+        ldx kid_face
+        bmi @xf_neg
+        jsr add_x16
+        jmp @yadd
+@xf_neg:
+        eor #$ff
+        clc
+        adc #1
+        jsr add_x16
+@yadd:  lda kid_yvel
+        tax
+        clc
+        adc kid_y
+        sta kid_y
+        txa
+        bmi @yn
+        lda kid_y+1
+        adc #0
+        sta kid_y+1
+        jmp @nofall
+@yn:    lda kid_y+1
+        adc #$ff
+        sta kid_y+1
+@nofall:
+        jsr post_move
+        jmp normalize
 
 ; kid_x += sext(A)
 add_x16:
@@ -924,3 +978,311 @@ normalize:
         sta kid_y+1
         jmp @rows
 @rdone: rts
+
+; ------------------------------------------------------------- guards
+guards_tick:
+        ldx #0
+@loop:  cpx #<NGUARD
+        bcc :+
+        rts
+:       lda g_used,x
+        bne :+
+        jmp @next
+:
+        txa
+        pha
+        jsr guard_cache_opp     ; the kid, before we swap him out
+        jsr guard_swap_in       ; guard -> zp struct, chid = 2
+        jsr guard_control
+        jsr char_step
+        lda kid_row             ; fell out of the world
+        bmi @gok
+        cmp #3
+        bcc @gok
+        lda #0
+        sta kid_alive
+        sta kid_hp
+@gok:   jsr check_plates        ; guards press plates too
+        jsr guard_swap_out
+        pla
+        tax
+@next:  inx
+        jmp @loop
+
+; -------------------------------------------------- strike resolution
+; TestStrike: frame 153 probes the defender's parry, 154 connects.
+resolve_strikes:
+        lda opp_ok
+        bne :+
+        rts
+:       lda opp_idx
+        cmp #$ff
+        bne :+
+        rts
+:       lda opp_alive
+        bne :+
+        rts
+:       lda kid_alive
+        bne :+
+        rts
+:       lda opp_row
+        cmp kid_row
+        beq :+
+        rts
+:       lda #0
+        sta zp_hitk
+        sta zp_hitg
+        ; dist
+        lda kid_x
+        sec
+        sbc opp_x
+        tax
+        lda kid_x+1
+        sbc opp_x+1
+        beq @pos
+        txa
+        eor #$ff
+        clc
+        adc #1
+        tax
+@pos:   stx zp_dist
+
+; --- guard strikes the kid
+        lda opp_frame
+        cmp #153
+        beq @g_probe
+        cmp #154
+        beq @g_probe
+        jmp @kid_side
+@g_probe:
+        ; kid parry pose deflects
+        lda kid_frame
+        cmp #150
+        beq @g_parried
+        cmp #161
+        bne @g_nopar
+@g_parried:
+        lda zp_dist
+        cmp #29
+        bcs @g_nopar
+        lda #161
+        sta kid_frame
+        ; guard: blockedstrike
+        ldx opp_idx
+        jsr guard_swap_in
+        SEQSET SEQ_blockedstrike
+        jsr kid_animate
+        jsr guard_swap_out
+        ldx opp_idx
+        lda #4
+        sta g_jblk,x
+        jmp @kid_side
+@g_nopar:
+        lda opp_frame
+        cmp #154
+        bne @kid_side
+        lda kid_swd
+        beq @g_offg
+        lda zp_dist
+        cmp #12
+        bcc @kid_side
+        cmp #29
+        bcs @kid_side
+        lda #1
+        sta zp_hitk
+        jmp @kid_side
+@g_offg:
+        lda zp_dist
+        cmp #12
+        bcs @kid_side
+        lda #100
+        sta zp_hitk
+
+; --- kid strikes the guard
+@kid_side:
+        lda kid_frame
+        cmp #153
+        beq @k_probe
+        cmp #154
+        beq @k_probe
+        jmp @apply
+@k_probe:
+        lda opp_frame
+        cmp #150
+        beq @k_parried
+        cmp #161
+        bne @k_nopar
+@k_parried:
+        lda zp_dist
+        cmp #29
+        bcs @k_nopar
+        ; guard deflects: his frame snaps to the riposte stance
+        ldy opp_idx
+        jsr opp_ptr
+        ldy #10
+        lda #161
+        sta (zp_ptr),y
+        SEQSET SEQ_blockedstrike
+        jsr kid_animate
+        jmp @apply
+@k_nopar:
+        lda kid_frame
+        cmp #154
+        bne @apply
+        ldx opp_idx
+        lda g_engaged,x
+        beq @k_offg
+        lda zp_dist
+        cmp #12
+        bcc @apply
+        cmp #29
+        bcs @apply
+        lda #1
+        sta zp_hitg
+        jmp @apply
+@k_offg:
+        lda zp_dist
+        cmp #12
+        bcs @apply
+        lda #100
+        sta zp_hitg
+
+@apply: ; simultaneous lunges: the player wins the tie
+        lda zp_hitk
+        beq :+
+        lda zp_hitg
+        beq :+
+        lda #0
+        sta zp_hitk
+:       lda zp_hitg
+        beq :+
+        jsr hit_guard
+:       lda zp_hitk
+        beq :+
+        jsr hit_kid
+:       rts
+
+; zp_ptr -> guard Y state
+opp_ptr:
+        lda #<g_state
+        sta zp_ptr
+        lda #>g_state
+        sta zp_ptr+1
+        cpy #0
+        beq :+
+        clc
+        lda zp_ptr
+        adc #CHRSIZE
+        sta zp_ptr
+        bcc :+
+        inc zp_ptr+1
+:       rts
+
+; damage the guard by zp_hitg
+hit_guard:
+        ldx opp_idx
+        lda g_hurtcd,x
+        beq :+
+        rts
+:       lda #8
+        sta g_hurtcd,x
+        ldy opp_idx
+        jsr opp_ptr
+        ldy #14                 ; hp
+        lda (zp_ptr),y
+        sec
+        sbc zp_hitg
+        beq @dead
+        bmi @dead
+        sta (zp_ptr),y
+        ldx opp_idx
+        jsr guard_swap_in
+        SEQSET SEQ_stabbed
+        jsr kid_animate
+        jmp guard_swap_out
+@dead:  lda #0
+        sta (zp_ptr),y
+        ldy #13                 ; alive
+        sta (zp_ptr),y
+        ldx opp_idx
+        jsr guard_swap_in
+        SEQSET SEQ_dropdead
+        jsr kid_animate
+        jmp guard_swap_out
+
+; damage the kid by zp_hitk
+hit_kid:
+        lda kid_hurtcd
+        beq :+
+        rts
+:       lda #8
+        sta kid_hurtcd
+        lda kid_hp
+        sec
+        sbc zp_hitk
+        beq @dead
+        bmi @dead
+        sta kid_hp
+        SEQSET SEQ_stabbed
+        jmp kid_animate
+@dead:  lda #0
+        sta kid_hp
+        sta kid_alive
+        SEQSET SEQ_dropdead
+        jmp kid_animate
+
+; the kid can't walk through a living guard
+separation:
+        lda opp_ok
+        bne :+
+        rts
+:       lda opp_alive
+        bne :+
+        rts
+:       lda opp_room
+        cmp kid_room
+        beq :+
+        rts
+:       lda opp_row
+        cmp kid_row
+        beq :+
+        rts
+:       lda kid_action
+        cmp #ACT_STAND
+        beq @chk
+        cmp #ACT_MOVE
+        beq @chk
+        rts
+@chk:   lda kid_x
+        sec
+        sbc opp_x
+        tax
+        lda kid_x+1
+        sbc opp_x+1
+        beq @right              ; kid right of (or at) the guard
+        ; kid left of the guard: dist = -diff
+        txa
+        eor #$ff
+        clc
+        adc #1
+        cmp #10
+        bcs @ok
+        ; kid_x = opp_x - 10
+        sec
+        lda opp_x
+        sbc #10
+        sta kid_x
+        lda opp_x+1
+        sbc #0
+        sta kid_x+1
+        rts
+@right: cpx #10
+        bcs @ok
+        clc
+        lda opp_x
+        adc #10
+        sta kid_x
+        lda opp_x+1
+        adc #0
+        sta kid_x+1
+@ok:    rts

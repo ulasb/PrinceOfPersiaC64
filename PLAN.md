@@ -76,8 +76,11 @@ onto the C64 fixed multicolor set per 4×8 cell — needs experimentation in Pha
       with falling debris, level reset via first-touch backup; Level 1 is
       completable end-to-end (spikes/slicers/potions/sword still pending —
       they ride along with the guard build)
-- [ ] **6. Guards & combat** — guard AI (skill table), engarde, strike/parry/
-      block, health, per-level guard variants
+- [x] **6. Guards & combat** — guard AI (skill table), engarde, strike/parry/
+      block, health hearts, sword pickup; kid = 8 hardware sprites (body +
+      sword), guards software-blitted; verified by a scripted duel-to-the-
+      death run that then completes the level (guard sword overlay, other
+      CHTAB4 variants and NPC levels still pending)
 - [ ] **7. Game flow** — title, HUD (health/level/time), death/restart, level
       progression, 60-minute limit
 - [ ] **8. Sound** — SID effect equivalents of the 19 synthesized effects

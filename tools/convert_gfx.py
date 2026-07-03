@@ -57,6 +57,17 @@ def reachable_bg(table_bit7):
     return {u for u in used if not (u & 0x80)}
 
 
+def ch5_kid_images():
+    """CHTAB5 images used by kid MAIN frames (combat stances, deaths,
+    potions) — the guard-only bulk of CHTAB5 stays out."""
+    used = set()
+    for f, (img, sword, _dx, _dy, _chk) in framedefs.MAIN.items():
+        table = ((img & 0x80) >> 5) | ((sword & 0xC0) >> 6)
+        if table == 4:
+            used.add(img & 0x7F)
+    return used
+
+
 def bg1_reachable():
     return reachable_bg(False)
 
@@ -239,12 +250,13 @@ WINDOWS = [("GFX1", 0x5000, 0x8A80), ("GFX9", 0x9000, 0xA000),
 # demo set: dungeon backgrounds + kid/guard tables. Character archives are
 # RLE-compressed (decompressed per frame at draw time); CHTAB5 (deaths,
 # potions, princess) still doesn't fit — see PLAN.md.
-PACK_SET = [("BG1", "IMG.BGTAB1.DUN", False, bg1_reachable, False),
-            ("BG2", "IMG.BGTAB2.DUN", False, bg2_reachable, False),
+PACK_SET = [("BG1", "IMG.BGTAB1.DUN", False, bg1_reachable, True),
+            ("BG2", "IMG.BGTAB2.DUN", False, bg2_reachable, True),
             ("CH1", "IMG.CHTAB1", True, None, True),
             ("CH2", "IMG.CHTAB2", True, None, True),
             ("CH3", "IMG.CHTAB3", True, None, True),
-            ("CH4", "IMG.CHTAB4.GD", True, None, True)]
+            ("CH4", "IMG.CHTAB4.GD", True, None, True),
+            ("CH5", "IMG.CHTAB5", True, ch5_kid_images, True)]
 
 
 def pack_windows():

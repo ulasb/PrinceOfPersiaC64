@@ -12,6 +12,7 @@
 
         .export tiles_init, tiles_reset, tiles_tick, tiles_redraw
         .export shake_loose, press_plate, loose_state, draw_falling
+        .export set_tile
         .import lv_tile, lv_spec, lv_resolve, lv_calc, lv_link, LEVEL
         .import draw_block, draw_front_block, clear_block_rect
         .import piece_at, set_room_ptr

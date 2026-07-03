@@ -5,7 +5,11 @@
         .import blit_init, draw_room, draw_foreground
         .import LEVEL
         .import gfxh_start, gfxh_end
-        .import char_init, kid_draw, kid_restore, spr_hide
+        .import __SEQDATA_LOAD__, __SEQDATA_RUN__, __SEQDATA_SIZE__
+        .import char_init, kid_draw, kid_restore, spr_hide, sword_hide
+        .import kid_sword_draw, save_invalidate
+        .import guard_swap_in, guard_swap_out
+        .import g_used, g_state, NGUARD
         .import game_tick, kid_spawn, kid_getcol
         .import tiles_init, tiles_reset, tiles_redraw, draw_falling
 
@@ -66,6 +70,31 @@ entry:
         dex
         bne @copy
 
+        ; move the sequence table under the I/O area ($d000)
+        lda #<__SEQDATA_LOAD__
+        sta zp_src
+        lda #>__SEQDATA_LOAD__
+        sta zp_src+1
+        lda #<__SEQDATA_RUN__
+        sta zp_dst
+        lda #>__SEQDATA_RUN__
+        sta zp_dst+1
+        lda #$34                ; all RAM while we write $d000+
+        sta $01
+        ldx #>__SEQDATA_SIZE__
+        inx
+        ldy #0
+@scopy: lda (zp_src),y
+        sta (zp_dst),y
+        iny
+        bne @scopy
+        inc zp_src+1
+        inc zp_dst+1
+        dex
+        bne @scopy
+        lda #$35
+        sta $01
+
         ; VIC: bank 2 ($8000), bitmap $a000, matrix $8c00, multicolor
         lda $dd02
         ora #$03
@@ -112,7 +141,7 @@ entry:
         sta $d025
         lda #14                 ; %11 = light blue
         sta $d026
-        ldx #5
+        ldx #7
         lda #8                  ; %10 = orange
 @sprc:  sta $d027,x
         dex
@@ -124,6 +153,16 @@ entry:
         sta SPRPTR,x
         dex
         bpl @sprp
+        lda #SWSPRBLK
+        sta SPRPTR+6
+        lda #SWSPRBLK+1
+        sta SPRPTR+7
+        ; HUD row cells: %01 = red (kid hearts), %10 = blue (guard)
+        ldx #39
+        lda #$26
+@hudc:  sta VIC_MATRIX+24*40,x
+        dex
+        bpl @hudc
 
         ; CIA port A as input for joystick 2
         lda #0
@@ -186,26 +225,121 @@ mainloop:
         beq @noredraw
         lda #0
         sta zp_moved
+        jsr save_invalidate
         lda zp_visroom
         sta zp_room
         jsr draw_room
         jsr draw_foreground
-        jmp @drawkid
+        jmp @guards
 @noredraw:
+        jsr kid_restore         ; guard save-under from last tick
         jsr tiles_redraw
         jsr draw_falling
-@drawkid:
+@guards:
+        jsr draw_guard
         lda kid_room
         cmp zp_visroom
         beq :+
         jsr spr_hide
+        jsr sword_hide
         jmp @nokid
 :       jsr kid_draw
-@nokid:
+        lda kid_swd
+        bne :+
+        jsr sword_hide
+        jmp @nokid
+:       jsr kid_sword_draw
+@nokid: jsr hud_update
 .ifdef TESTSCRIPT
         jsr dbg_dump
 .endif
         jmp mainloop
+
+; draw the first live-or-dying guard in the visible room (software blit)
+draw_guard:
+        ldx #0
+@loop:  cpx #<NGUARD
+        bcs @none
+        lda g_used,x
+        beq @next
+        txa
+        pha
+        jsr guard_swap_in
+        lda kid_room
+        cmp zp_visroom
+        bne @skip
+        jsr kid_draw            ; chid=2: save-under blit path
+        jsr guard_swap_out
+        pla
+        tax
+        rts
+@skip:  jsr guard_swap_out
+        pla
+        tax
+@next:  inx
+        bne @loop
+@none:  rts
+
+; hearts: kid bottom-left (red), opponent bottom-right (blue)
+hud_update:
+        ldx #0
+@k:     lda #$10                ; lost heart: single dim pip
+        cpx kid_hp
+        bcs :+
+        lda #$55
+:       sta zp_hudval
+        txa
+        pha
+        jsr hud_cell
+        pla
+        tax
+        inx
+        cpx #3
+        bne @k
+        ; opponent hearts fill right-to-left
+        ldx #0
+@g:     lda #0
+        sta zp_hudval
+        lda opp_ok
+        beq @gv
+        lda opp_alive
+        beq @gv
+        cpx opp_hp
+        bcs @gv
+        lda #$aa
+        sta zp_hudval
+@gv:    stx zp_tmp
+        lda #39
+        sec
+        sbc zp_tmp
+        jsr hud_cell
+        ldx zp_tmp
+        inx
+        cpx #10
+        bne @g
+        rts
+
+; fill HUD cell A (0-39) with zp_hudval
+hud_cell:
+        sta zp_ptr
+        lda #0
+        sta zp_ptr+1
+        asl zp_ptr
+        rol zp_ptr+1
+        asl zp_ptr
+        rol zp_ptr+1
+        asl zp_ptr
+        rol zp_ptr+1
+        clc
+        lda zp_ptr+1
+        adc #$be
+        sta zp_ptr+1
+        ldy #7
+        lda zp_hudval
+@f:     sta (zp_ptr),y
+        dey
+        bpl @f
+        rts
 
 ; white border flourish on finishing the level
 victory_flash:
@@ -262,7 +396,8 @@ dbgsrc_end:
 
 ; scripted input for headless runs: (tick count, input byte) pairs.
 ; count 0 ends the script; count $fe = seek: careful-step until the kid
-; stands on column <value>, then advance (closed-loop positioning).
+; stands on column <value>; count $fd = duel: tap strike every <value>
+; ticks until the opponent is dead.
 read_input:
         lda script_left
         bne @feed
@@ -271,6 +406,8 @@ read_input:
         beq @off                ; terminator
         cmp #$fe
         beq @seek
+        cmp #$fd
+        beq @fight
         sta script_left
         lda tscript+1,x
         sta script_val
@@ -309,28 +446,74 @@ read_input:
 @right: lda #IN_SHIFT|IN_RIGHT
         sta zp_input
         rts
+@fight: ; duel until the opponent falls
+        lda opp_ok
+        beq @fwon
+        lda opp_alive
+        beq @fwon
+        lda script_val          ; phase countdown within the duel
+        beq @ftap
+        dec script_val
+        lda #0
+        sta zp_input
+        rts
+@ftap:  ldx script_idx
+        lda tscript+1,x         ; reload the tap period
+        sta script_val
+        lda #IN_SHIFT
+        sta zp_input
+        rts
+@fwon:  ldx script_idx          ; opponent down: next entry
+        inx
+        inx
+        stx script_idx
+        lda #0
+        sta zp_input
+        sta script_val
+        rts
 
 tscript:
         .byte 6, 0              ; entry drop
-        .byte 40, IN_RIGHT      ; to the bottom row, over the loose tile
+        .byte 40, IN_RIGHT      ; to the bottom row
         .byte 24, 0             ; loose floor breaks
         .byte 20, IN_LEFT       ; into the hole, fall to room 2
         .byte 16, 0
-        .byte 200, IN_RIGHT     ; rooms 2 -> 3 -> 9, bump the right wall
-        .byte 12, 0
-        .byte $fe, 1            ; seek the column beside the plate pillar
-        .byte 4, 0
-        .byte 30, IN_UP|IN_SHIFT ; climb onto the pressure plate
-        .byte 10, 0
-        .byte 30, IN_UP|IN_SHIFT ; (second try if the first grab slipped)
-        .byte 40, 0             ; stand on the plate; exit door opens
-        .byte 14, IN_RIGHT      ; run off the plate, drop to the corridor
+        .byte 60, IN_RIGHT      ; through room 2, stop near the edge
         .byte 14, 0
-        .byte $fe, 3            ; seek the exit stairs tile
+        .byte 1, IN_SHIFT|IN_RIGHT
+        .byte 9, 0
+        .byte 1, IN_SHIFT|IN_RIGHT
+        .byte 9, 0
+        .byte 1, IN_SHIFT|IN_RIGHT
+        .byte 9, 0
+        .byte 1, IN_SHIFT|IN_RIGHT
+        .byte 9, 0
+        .byte 1, IN_SHIFT|IN_RIGHT
+        .byte 9, 0
+        .byte 1, IN_SHIFT|IN_RIGHT
+        .byte 9, 0
+        .byte 1, IN_SHIFT|IN_RIGHT
+        .byte 9, 0
+        .byte 1, IN_SHIFT|IN_RIGHT
+        .byte 9, 0
+        .byte 40, 0             ; standing in room 3: en garde
+        .byte $fd, 9            ; duel to the death
+        .byte 40, 0             ; resheathe
+        .byte 200, IN_RIGHT     ; to room 9, bump the right wall
+        .byte 12, 0
+        .byte $fe, 1            ; seek the plate pillar column
         .byte 4, 0
-        .byte 12, IN_UP         ; up the stairs!
+        .byte 30, IN_UP|IN_SHIFT
+        .byte 10, 0
+        .byte 30, IN_UP|IN_SHIFT
+        .byte 40, 0             ; on the plate; the exit door opens
+        .byte 14, IN_RIGHT      ; off the plate
+        .byte 14, 0
+        .byte $fe, 3            ; to the exit door
+        .byte 4, 0
+        .byte 12, IN_UP
         .byte 20, 0
-        .byte $fe, 4            ; (or the second door tile)
+        .byte $fe, 4
         .byte 4, 0
         .byte 12, IN_UP
         .byte 150, 0            ; victory

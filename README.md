@@ -12,7 +12,7 @@ behavioral ground truth for this port.
 
 ![Level 1 on the C64](docs/screenshots/level1_start.png)
 
-## Status: Level 1 playable start to finish
+## Status: Level 1 playable start to finish — guards included
 
 Level 1 renders and plays with a joystick — from the opening drop out of
 the entrance gate to climbing the exit stairs:
@@ -27,6 +27,11 @@ the entrance gate to climbing the exit stairs:
   crouching, climbing up and down, hanging from ledges, mid-air ledge grabs,
   falling with the original damage thresholds, wall and gate collision —
   including Level 1's iconic opening drop out of the entrance gate
+- **Swordplay**: guards spawn from the level data with the original
+  skill-based AI (engage, advance, retreat, strike, reactive block), the
+  kid fights back with the full engarde move set — strikes, parries,
+  ripostes, sheathing — resolved with the original strike/block frame
+  rules; sword pickup works, both fighters' health shows as hearts
 - **Tile machinery**: loose floors that shake, break and fall as debris,
   pressure plates driving gates and the exit door through the original
   LINKLOC/LINKMAP wiring, gates that rise/slam with the original state
@@ -35,10 +40,12 @@ the entrance gate to climbing the exit stairs:
 - Headless test harness: scripted input (with a closed-loop "walk to
   column" opcode), VICE remote-monitor state dumps, screenshot verification
 
+![Sword fight with the level 1 guard](docs/screenshots/sword_fight.png)
+
 ![The exit door, opened by the pressure plate](docs/screenshots/exit_open.png)
 
-Not yet: guards and sword combat, spikes/slicers/potions, sound, HUD, the
-other 13 levels. See [PLAN.md](PLAN.md) for the roadmap.
+Not yet: spikes/slicers/potions, guard sword overlay, sound, the other
+13 levels. See [PLAN.md](PLAN.md) for the roadmap.
 
 ![Falling off the ledge](docs/screenshots/ledge_fall.png)
 
